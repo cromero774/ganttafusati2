@@ -26,12 +26,12 @@ def crear_datos_prueba():
     return pd.DataFrame(data)
 
 try:
-    # Intentar leer el archivo CSV
+    # Leer solo las columnas de la tabla azul (ajustado según tu imagen)
     debug_print("Intentando leer el archivo CSV...")
-    df = pd.read_csv(sheet_url, skiprows=13, usecols=[2, 5, 6, 7])
+    df = pd.read_csv(sheet_url, skiprows=13, usecols=[0, 3, 4, 5])
     debug_print(f"CSV leído. Forma del DataFrame: {df.shape}")
     debug_print(f"Columnas encontradas: {df.columns.tolist()}")
-    
+
     # Renombrar columnas
     debug_print("Renombrando columnas...")
     columnas_originales = df.columns.tolist()
@@ -46,23 +46,23 @@ try:
     else:
         debug_print(f"ADVERTENCIA: No hay suficientes columnas. Encontradas: {columnas_originales}")
         df = crear_datos_prueba()
-    
+
     # Validar que las columnas requeridas existen
     columnas_requeridas = ['RN', 'Estado', 'Inicio', 'Fin']
     if not all(col in df.columns for col in columnas_requeridas):
         debug_print(f"ADVERTENCIA: No se encontraron todas las columnas requeridas.")
         df = crear_datos_prueba()
-    
+
     # Eliminar filas con valores nulos en las fechas
     df_original_len = len(df)
     df = df.dropna(subset=['Inicio', 'Fin'])
     debug_print(f"Filas eliminadas por valores nulos: {df_original_len - len(df)}")
-    
+
     # Intentar convertir las fechas
     debug_print("Intentando convertir fechas...")
     debug_print(f"Ejemplos de valores en 'Inicio': {df['Inicio'].head(3).tolist()}")
     debug_print(f"Ejemplos de valores en 'Fin': {df['Fin'].head(3).tolist()}")
-    
+
     # Verificar si los valores son numéricos (posiblemente fechas en formato Excel)
     def es_numerico(valor):
         try:
@@ -70,7 +70,7 @@ try:
             return True
         except (ValueError, TypeError):
             return False
-    
+
     # Si las "fechas" son números, probablemente son fechas de Excel
     if df['Inicio'].apply(es_numerico).all() and df['Fin'].apply(es_numerico).all():
         debug_print("Detectados posibles valores de fecha en formato Excel, convirtiendo...")
@@ -81,17 +81,17 @@ try:
         # Intentar convertir fechas normales
         df['Inicio'] = pd.to_datetime(df['Inicio'], errors='coerce')
         df['Fin'] = pd.to_datetime(df['Fin'], errors='coerce')
-    
+
     # Eliminar filas donde la conversión de fechas falló
     df_fechas_len = len(df)
     df = df.dropna(subset=['Inicio', 'Fin'])
     debug_print(f"Filas eliminadas por fechas inválidas: {df_fechas_len - len(df)}")
-    
+
     # Si no quedan datos válidos, usar datos de prueba
     if len(df) == 0:
         debug_print("No hay datos válidos después del procesamiento. Usando datos de prueba.")
         df = crear_datos_prueba()
-    
+
 except Exception as e:
     debug_print(f"ERROR: {str(e)}")
     df = crear_datos_prueba()
@@ -129,27 +129,24 @@ server = app.server
 
 app.layout = html.Div([
     html.H1("Gantt Desarrollo Postventa", style={'textAlign': 'center'}),
-    
     html.Div([
         html.Label("Seleccionar Mes (por fecha de finalización):"),
         dcc.Dropdown(
             id='mes-dropdown',
-            options=[{'label': 'Todos', 'value': 'Todos'}] + 
+            options=[{'label': 'Todos', 'value': 'Todos'}] +
                     [{'label': mes, 'value': mes} for mes in sorted(df['Mes'].unique())],
             value='Todos'
         )
     ], style={'width': '48%', 'display': 'inline-block'}),
-    
     html.Div([
         html.Label("Seleccionar Estado:"),
         dcc.Dropdown(
             id='estado-dropdown',
-            options=[{'label': 'Todos', 'value': 'Todos'}] + 
+            options=[{'label': 'Todos', 'value': 'Todos'}] +
                     [{'label': estado, 'value': estado} for estado in sorted(df['Estado'].unique())],
             value='Todos'
         )
     ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'}),
-    
     dcc.Graph(id='gantt-graph')
 ])
 
@@ -160,12 +157,12 @@ app.layout = html.Div([
 )
 def actualizar_gantt(mes_seleccionado, estado_seleccionado):
     debug_print(f"Callback ejecutado: mes={mes_seleccionado}, estado={estado_seleccionado}")
-    
+
     df_filtrado = df if mes_seleccionado == 'Todos' else df[df['Mes'] == mes_seleccionado]
     df_filtrado = df_filtrado if estado_seleccionado == 'Todos' else df_filtrado[df_filtrado['Estado'] == estado_seleccionado]
-    
+
     debug_print(f"DataFrame filtrado: {len(df_filtrado)} filas")
-    
+
     fig = px.timeline(
         df_filtrado,
         x_start="Inicio",
@@ -206,7 +203,6 @@ def actualizar_gantt(mes_seleccionado, estado_seleccionado):
             visible=False
         )
     )
-    
     debug_print("Figura creada y enviada al cliente")
     return fig
 
@@ -215,7 +211,7 @@ if __name__ == '__main__':
     import os
     port = int(os.environ.get('PORT', 8080))
     debug_print(f"Puerto configurado: {port}")
-    
+
     # Compatibilidad con diferentes versiones de Dash
     try:
         # Para versiones más recientes de Dash
