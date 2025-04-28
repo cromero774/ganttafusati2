@@ -1,1 +1,1 @@
-web: python3 gantt_postventa.py
+web: gunicorn gantt_postventa:server
