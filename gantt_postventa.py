@@ -26,44 +26,34 @@ def crear_datos_prueba():
     return pd.DataFrame(data)
 
 try:
-    # Leer solo las columnas de la tabla azul (ajustado según tu imagen)
     debug_print("Intentando leer el archivo CSV...")
+
+    # Leer tabla azul: encabezado en fila 14 (índice 13), columnas 0,3,4,5
     df = pd.read_csv(sheet_url, skiprows=13, usecols=[0, 3, 4, 5])
     debug_print(f"CSV leído. Forma del DataFrame: {df.shape}")
     debug_print(f"Columnas encontradas: {df.columns.tolist()}")
 
-    # Renombrar columnas
-    debug_print("Renombrando columnas...")
-    columnas_originales = df.columns.tolist()
-    if len(columnas_originales) >= 4:
-        df = df.rename(columns={
-            columnas_originales[0]: 'RN',
-            columnas_originales[1]: 'Estado',
-            columnas_originales[2]: 'Inicio',
-            columnas_originales[3]: 'Fin'
-        })
-        debug_print(f"Columnas después de renombrar: {df.columns.tolist()}")
-    else:
-        debug_print(f"ADVERTENCIA: No hay suficientes columnas. Encontradas: {columnas_originales}")
-        df = crear_datos_prueba()
+    # Renombrar columnas para trabajar con nombres estándar
+    df = df.rename(columns={
+        df.columns[0]: 'RN',
+        df.columns[1]: 'Estado',
+        df.columns[2]: 'Inicio',
+        df.columns[3]: 'Fin'
+    })
+    debug_print(f"Columnas después de renombrar: {df.columns.tolist()}")
 
     # Validar que las columnas requeridas existen
     columnas_requeridas = ['RN', 'Estado', 'Inicio', 'Fin']
     if not all(col in df.columns for col in columnas_requeridas):
-        debug_print(f"ADVERTENCIA: No se encontraron todas las columnas requeridas.")
+        debug_print("ADVERTENCIA: No se encontraron todas las columnas requeridas.")
         df = crear_datos_prueba()
 
-    # Eliminar filas con valores nulos en las fechas
+    # Eliminar filas con valores nulos en fechas
     df_original_len = len(df)
     df = df.dropna(subset=['Inicio', 'Fin'])
     debug_print(f"Filas eliminadas por valores nulos: {df_original_len - len(df)}")
 
-    # Intentar convertir las fechas
-    debug_print("Intentando convertir fechas...")
-    debug_print(f"Ejemplos de valores en 'Inicio': {df['Inicio'].head(3).tolist()}")
-    debug_print(f"Ejemplos de valores en 'Fin': {df['Fin'].head(3).tolist()}")
-
-    # Verificar si los valores son numéricos (posiblemente fechas en formato Excel)
+    # Detectar si las fechas están en formato numérico (fecha Excel)
     def es_numerico(valor):
         try:
             float(valor)
@@ -71,18 +61,15 @@ try:
         except (ValueError, TypeError):
             return False
 
-    # Si las "fechas" son números, probablemente son fechas de Excel
     if df['Inicio'].apply(es_numerico).all() and df['Fin'].apply(es_numerico).all():
-        debug_print("Detectados posibles valores de fecha en formato Excel, convirtiendo...")
-        # Convertir fechas de Excel (días desde 1900-01-01)
+        debug_print("Fechas en formato numérico detectadas, convirtiendo desde formato Excel...")
         df['Inicio'] = pd.to_datetime('1899-12-30') + pd.to_timedelta(df['Inicio'].astype(float), unit='D')
         df['Fin'] = pd.to_datetime('1899-12-30') + pd.to_timedelta(df['Fin'].astype(float), unit='D')
     else:
-        # Intentar convertir fechas normales
         df['Inicio'] = pd.to_datetime(df['Inicio'], errors='coerce')
         df['Fin'] = pd.to_datetime(df['Fin'], errors='coerce')
 
-    # Eliminar filas donde la conversión de fechas falló
+    # Eliminar filas con fechas inválidas tras conversión
     df_fechas_len = len(df)
     df = df.dropna(subset=['Inicio', 'Fin'])
     debug_print(f"Filas eliminadas por fechas inválidas: {df_fechas_len - len(df)}")
@@ -93,27 +80,22 @@ try:
         df = crear_datos_prueba()
 
 except Exception as e:
-    debug_print(f"ERROR: {str(e)}")
+    debug_print(f"ERROR al leer CSV: {str(e)}")
     df = crear_datos_prueba()
 
-# Crear columnas para hover
+# Preparar columnas para hover y visualización
 df['Inicio_str'] = df['Inicio'].dt.strftime('%Y-%m-%d')
 df['Fin_str'] = df['Fin'].dt.strftime('%Y-%m-%d')
 
-# Ordenar y resetear índice
 df = df.sort_values(by='Inicio').reset_index(drop=True)
-
-# Calcular duración y mes
 df['Duracion'] = (df['Fin'] - df['Inicio']).dt.days
 df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
-
-# Acortar nombres RN
 df['RN_short'] = df['RN'].str.slice(0, 20) + df['RN'].apply(lambda x: '...' if len(str(x)) > 20 else '')
 
 debug_print(f"DataFrame final: {len(df)} filas, estados únicos: {df['Estado'].unique().tolist()}")
 debug_print(f"Meses únicos: {df['Mes'].unique().tolist()}")
 
-# Colores personalizados
+# Colores personalizados para estados
 color_estado = {
     'Entregado': 'green',
     'En desarrollo': 'teal',
@@ -212,10 +194,8 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print(f"Puerto configurado: {port}")
 
-    # Compatibilidad con diferentes versiones de Dash
     try:
-        # Para versiones más recientes de Dash
         app.run(host='0.0.0.0', port=port)
     except AttributeError:
-        # Para versiones anteriores de Dash
         app.run_server(host='0.0.0.0', port=port)
+
