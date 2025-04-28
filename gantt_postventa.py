@@ -2,134 +2,113 @@ import pandas as pd
 import plotly.express as px
 from dash import Dash, dcc, html, Input, Output
 import sys
+import requests
+import os
 
-# Función para imprimir mensajes de depuración
 def debug_print(message):
     print(f"DEBUG: {message}", file=sys.stderr)
     sys.stderr.flush()
 
 debug_print("Iniciando aplicación...")
 
-# URL pública para exportar Google Sheets como CSV (primera hoja)
-sheet_url = "https://docs.google.com/spreadsheets/d/13d_Jei6oAufaEJFa5i5GJk4yYvFSNYEI/export?format=csv"
-debug_print(f"URL de la hoja: {sheet_url}")
+# Configuración CSV
+sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTRvUazuzfWjGl5VWuZJUJslZEf-PpYyHZ_5G2SXwPtu16R71mPSKVQTYjen9UBwQ/pub?gid=865145678&single=true&output=csv"
 
-# Crear datos de prueba para garantizar que siempre haya datos válidos
-def crear_datos_prueba():
-    debug_print("Creando datos de prueba...")
-    data = {
-        'RN': ['Tarea 1', 'Tarea 2', 'Tarea 3', 'Tarea 4', 'Tarea 5'],
-        'Estado': ['Entregado', 'En desarrollo', 'Backlog', 'Para refinar', 'Escribiendo'],
-        'Inicio': pd.to_datetime(['2025-01-01', '2025-01-15', '2025-02-01', '2025-02-15', '2025-03-01']),
-        'Fin': pd.to_datetime(['2025-01-14', '2025-01-30', '2025-02-15', '2025-02-28', '2025-03-15'])
-    }
-    return pd.DataFrame(data)
-
+# Carga y limpieza de datos
 try:
-    debug_print("Intentando leer el archivo CSV...")
+    response = requests.get(sheet_url, timeout=15)
+    response.raise_for_status()
+    
+    df = pd.read_csv(sheet_url)
+    df.columns = df.columns.str.strip()
+    
+    # Limpieza avanzada de datos
+    df['RN'] = df['RN'].astype(str).str.replace(r'[\xa0\s]+', ' ', regex=True).str.strip()
+    
+    # Procesamiento de fechas robusto
+    date_cols = ['Inicio', 'Fin']
+    for col in date_cols:
+        df[col] = pd.to_datetime(df[col], format='%m/%d/%Y', errors='coerce')
+    
+    df = df.dropna(subset=date_cols)
+    
+    if df.empty:
+        debug_print("Usando datos de muestra...")
+        sample_dates = pd.date_range(start='2023-01-01', periods=3)
+        df = pd.DataFrame({
+            'RN': ['Muestra 1', 'Muestra 2', 'Muestra 3'],
+            'Estado': ['En desarrollo', 'Entregado', 'Backlog'],
+            'Inicio': sample_dates,
+            'Fin': sample_dates + pd.Timedelta(days=30)
+        })
 
-    # Leer tabla azul: encabezado en fila 14 (índice 13), columnas 0,3,4,5
-    df = pd.read_csv(sheet_url, skiprows=13, usecols=[0, 3, 4, 5])
-    debug_print(f"CSV leído. Forma del DataFrame: {df.shape}")
-    debug_print(f"Columnas encontradas: {df.columns.tolist()}")
-
-    # Renombrar columnas para trabajar con nombres estándar
-    df = df.rename(columns={
-        df.columns[0]: 'RN',
-        df.columns[1]: 'Estado',
-        df.columns[2]: 'Inicio',
-        df.columns[3]: 'Fin'
-    })
-    debug_print(f"Columnas después de renombrar: {df.columns.tolist()}")
-
-    # Validar que las columnas requeridas existen
-    columnas_requeridas = ['RN', 'Estado', 'Inicio', 'Fin']
-    if not all(col in df.columns for col in columnas_requeridas):
-        debug_print("ADVERTENCIA: No se encontraron todas las columnas requeridas.")
-        df = crear_datos_prueba()
-
-    # Eliminar filas con valores nulos en fechas
-    df_original_len = len(df)
-    df = df.dropna(subset=['Inicio', 'Fin'])
-    debug_print(f"Filas eliminadas por valores nulos: {df_original_len - len(df)}")
-
-    # Detectar si las fechas están en formato numérico (fecha Excel)
-    def es_numerico(valor):
-        try:
-            float(valor)
-            return True
-        except (ValueError, TypeError):
-            return False
-
-    if df['Inicio'].apply(es_numerico).all() and df['Fin'].apply(es_numerico).all():
-        debug_print("Fechas en formato numérico detectadas, convirtiendo desde formato Excel...")
-        df['Inicio'] = pd.to_datetime('1899-12-30') + pd.to_timedelta(df['Inicio'].astype(float), unit='D')
-        df['Fin'] = pd.to_datetime('1899-12-30') + pd.to_timedelta(df['Fin'].astype(float), unit='D')
-    else:
-        df['Inicio'] = pd.to_datetime(df['Inicio'], errors='coerce')
-        df['Fin'] = pd.to_datetime(df['Fin'], errors='coerce')
-
-    # Eliminar filas con fechas inválidas tras conversión
-    df_fechas_len = len(df)
-    df = df.dropna(subset=['Inicio', 'Fin'])
-    debug_print(f"Filas eliminadas por fechas inválidas: {df_fechas_len - len(df)}")
-
-    # Si no quedan datos válidos, usar datos de prueba
-    if len(df) == 0:
-        debug_print("No hay datos válidos después del procesamiento. Usando datos de prueba.")
-        df = crear_datos_prueba()
+    # Cálculo de métricas
+    df['Inicio_str'] = df['Inicio'].dt.strftime('%Y-%m-%d')
+    df['Fin_str'] = df['Fin'].dt.strftime('%Y-%m-%d')
+    df['Duracion'] = (df['Fin'] - df['Inicio']).dt.days
+    df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
+    df['RN_short'] = df['RN'].str.wrap(20).str.split('\n').str[0] + '...'
 
 except Exception as e:
-    debug_print(f"ERROR al leer CSV: {str(e)}")
-    df = crear_datos_prueba()
+    debug_print(f"Error: {str(e)}")
+    sample_dates = pd.date_range(start='2023-01-01', periods=3)
+    df = pd.DataFrame({
+        'RN': ['Error - Datos', 'Ejemplo 1', 'Ejemplo 2'],
+        'Estado': ['Error', 'Muestra', 'Muestra'],
+        'Inicio': sample_dates,
+        'Fin': sample_dates + pd.Timedelta(days=30),
+        'Inicio_str': sample_dates.strftime('%Y-%m-%d'),
+        'Fin_str': (sample_dates + pd.Timedelta(days=30)).strftime('%Y-%m-%d'),
+        'Duracion': [30, 30, 30],
+        'Mes': sample_dates.strftime('%Y-%m'),
+        'RN_short': ['Error...', 'Muestra 1...', 'Muestra 2...']
+    })
 
-# Preparar columnas para hover y visualización
-df['Inicio_str'] = df['Inicio'].dt.strftime('%Y-%m-%d')
-df['Fin_str'] = df['Fin'].dt.strftime('%Y-%m-%d')
-
-df = df.sort_values(by='Inicio').reset_index(drop=True)
-df['Duracion'] = (df['Fin'] - df['Inicio']).dt.days
-df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
-df['RN_short'] = df['RN'].str.slice(0, 20) + df['RN'].apply(lambda x: '...' if len(str(x)) > 20 else '')
-
-debug_print(f"DataFrame final: {len(df)} filas, estados únicos: {df['Estado'].unique().tolist()}")
-debug_print(f"Meses únicos: {df['Mes'].unique().tolist()}")
-
-# Colores personalizados para estados
+# Paleta de colores mejorada
 color_estado = {
-    'Entregado': 'green',
-    'En desarrollo': 'teal',
-    'Backlog': 'yellow',
-    'Para refinar': 'lightyellow',
-    'Escribiendo': 'orange',
-    'Para escribir': 'red'
+    'Entregado': '#2ecc71',
+    'En desarrollo': '#3498db',
+    'Backlog': '#f1c40f',
+    'Para refinar': '#e67e22',
+    'Escribiendo': '#e74c3c',
+    'Para escribir': '#95a5a6',
+    'En Análisis': '#9b59b6',
+    'Cancelado': '#7f8c8d',
+    'Error': '#e74c3c'
 }
 
-# Crear app Dash
+# Configuración de la aplicación
 app = Dash(__name__)
 server = app.server
 
 app.layout = html.Div([
-    html.H1("Gantt Desarrollo Postventa", style={'textAlign': 'center'}),
+    html.H1("Gantt Postventa", style={'textAlign': 'center', 'margin': '20px 0'}),
+    
     html.Div([
-        html.Label("Seleccionar Mes (por fecha de finalización):"),
-        dcc.Dropdown(
-            id='mes-dropdown',
-            options=[{'label': 'Todos', 'value': 'Todos'}] +
-                    [{'label': mes, 'value': mes} for mes in sorted(df['Mes'].unique())],
-            value='Todos'
-        )
-    ], style={'width': '48%', 'display': 'inline-block'}),
-    html.Div([
-        html.Label("Seleccionar Estado:"),
-        dcc.Dropdown(
-            id='estado-dropdown',
-            options=[{'label': 'Todos', 'value': 'Todos'}] +
-                    [{'label': estado, 'value': estado} for estado in sorted(df['Estado'].unique())],
-            value='Todos'
-        )
-    ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'}),
-    dcc.Graph(id='gantt-graph')
+        html.Div([
+            html.Label("Mes Finalización:"),
+            dcc.Dropdown(
+                id='mes-dropdown',
+                options=[{'label': 'Todos', 'value': 'Todos'}] + 
+                       [{'label': mes, 'value': mes} for mes in sorted(df['Mes'].unique())],
+                value='Todos',
+                clearable=False
+            )
+        ], style={'width': '48%', 'display': 'inline-block'}),
+        
+        html.Div([
+            html.Label("Estado:"),
+            dcc.Dropdown(
+                id='estado-dropdown',
+                options=[{'label': 'Todos', 'value': 'Todos'}] + 
+                       [{'label': estado, 'value': estado} for estado in sorted(df['Estado'].unique())],
+                value='Todos',
+                clearable=False
+            )
+        ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'})
+    ], style={'marginBottom': '20px'}),
+    
+    dcc.Graph(id='gantt-graph', style={'height': '75vh'})
 ])
 
 @app.callback(
@@ -137,14 +116,17 @@ app.layout = html.Div([
     [Input('mes-dropdown', 'value'),
      Input('estado-dropdown', 'value')]
 )
-def actualizar_gantt(mes_seleccionado, estado_seleccionado):
-    debug_print(f"Callback ejecutado: mes={mes_seleccionado}, estado={estado_seleccionado}")
-
-    df_filtrado = df if mes_seleccionado == 'Todos' else df[df['Mes'] == mes_seleccionado]
-    df_filtrado = df_filtrado if estado_seleccionado == 'Todos' else df_filtrado[df_filtrado['Estado'] == estado_seleccionado]
-
-    debug_print(f"DataFrame filtrado: {len(df_filtrado)} filas")
-
+def actualizar_grafico(mes, estado):
+    df_filtrado = df.copy()
+    
+    if mes != 'Todos':
+        df_filtrado = df_filtrado[df_filtrado['Mes'] == mes]
+    if estado != 'Todos':
+        df_filtrado = df_filtrado[df_filtrado['Estado'] == estado]
+    
+    if df_filtrado.empty:
+        return px.scatter(title="Sin datos con los filtros seleccionados")
+    
     fig = px.timeline(
         df_filtrado,
         x_start="Inicio",
@@ -152,50 +134,44 @@ def actualizar_gantt(mes_seleccionado, estado_seleccionado):
         y="RN",
         color="Estado",
         color_discrete_map=color_estado,
-        custom_data=["RN", "Inicio_str", "Fin_str"],
-        hover_data={},
-        title=f"Gantt - Mes: {mes_seleccionado} - Estado: {estado_seleccionado}",
-        text="RN_short"
+        custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
+        labels={'Estado': 'Estado'},
+        title=f"Postventa - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
     )
-
+    
+    # Ajustes de visualización (solución a problemas reportados en los resultados de búsqueda)
     fig.update_traces(
         hovertemplate=(
-            "<b>RN: %{customdata[0]}</b><br>"
+            "<b>%{customdata[0]}</b><br>"
             "Inicio: %{customdata[1]}<br>"
-            "Fin: %{customdata[2]}"
+            "Fin: %{customdata[2]}<br>"
+            "Duración: %{customdata[3]} días"
         ),
-        texttemplate='%{text}',
-        textposition='inside',
-        insidetextanchor='middle',
-        textfont=dict(size=11, color='black')
+        marker=dict(line=dict(width=0.5, color='DarkSlateGrey'))
     )
-
+    
     fig.update_layout(
-        height=750,
-        xaxis_title="Fecha",
-        yaxis_title="",
-        legend_title="Estado",
-        hovermode="closest",
-        bargap=0.2,
-        uniformtext=dict(minsize=8, mode='hide'),
-        yaxis=dict(
-            autorange="reversed",
-            showticklabels=False,
-            showgrid=False,
-            visible=False
-        )
+        xaxis=dict(title="Fecha", tickformat="%Y-%m-%d"),
+        yaxis=dict(title="", autorange="reversed", automargin=True),
+        legend=dict(title="Estado", orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        margin=dict(l=20, r=20, t=80, b=20),
+        bargap=0.3,
+        height=600
     )
-    debug_print("Figura creada y enviada al cliente")
+    
     return fig
 
 if __name__ == '__main__':
-    debug_print("Iniciando servidor...")
-    import os
     port = int(os.environ.get('PORT', 8080))
-    debug_print(f"Puerto configurado: {port}")
+    debug_print("Iniciando servidor...")
+    app.run(host='0.0.0.0', port=port, debug=False)
 
-    try:
-        app.run(host='0.0.0.0', port=port)
-    except AttributeError:
-        app.run_server(host='0.0.0.0', port=port)
+
+
+
+
+
+
 
