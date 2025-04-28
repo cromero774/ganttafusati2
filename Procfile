@@ -1,1 +1,1 @@
-web: python gantt_postventa.py
+web: python3 gantt_postventa.py
