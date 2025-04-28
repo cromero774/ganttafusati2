@@ -2,15 +2,16 @@ import pandas as pd
 import plotly.express as px
 from dash import Dash, dcc, html, Input, Output
 
-# 1. Leer archivo Excel
-file_path = r'C:\Users\cromero\OneDrive - EVOLTIS\Documentos\Maipu\Pedidos\Estimacion_ Paquetes.xlsx'
-sheet_name = 'Paquete Dev postventa'
-usecols = [2, 5, 6, 7]
-skip_rows = 13
+# URL pública para exportar Google Sheets como CSV (primera hoja)
+sheet_url = "https://docs.google.com/spreadsheets/d/13d_Jei6oAufaEJFa5i5GJk4yYvFSNYEI/export?format=csv"
 
-df = pd.read_excel(file_path, sheet_name=sheet_name, skiprows=skip_rows, usecols=usecols, header=0)
+# Leer CSV con manejo de errores
+try:
+    df = pd.read_csv(sheet_url, skiprows=13, usecols=[2, 5, 6, 7])
+except Exception as e:
+    raise RuntimeError(f"No se pudo leer el Google Sheet: {e}")
 
-# 2. Preparar datos
+# Renombrar columnas
 df = df.rename(columns={
     df.columns[0]: 'RN',
     df.columns[1]: 'Estado',
@@ -18,27 +19,36 @@ df = df.rename(columns={
     df.columns[3]: 'Fin'
 })
 
-# Validación básica de columnas
+# Validar columnas requeridas
 columnas_requeridas = ['RN', 'Estado', 'Inicio', 'Fin']
 if not all(col in df.columns for col in columnas_requeridas):
     raise ValueError(f"El archivo debe contener estas columnas: {columnas_requeridas}")
 
+# Eliminar filas con fechas vacías
 df = df.dropna(subset=['Inicio', 'Fin'])
-df['Inicio'] = pd.to_datetime(df['Inicio'])
-df['Fin'] = pd.to_datetime(df['Fin'])
 
-# Convertir fechas a string para el hover
+# Convertir fechas con manejo de errores y coerción
+df['Inicio'] = pd.to_datetime(df['Inicio'], errors='coerce')
+df['Fin'] = pd.to_datetime(df['Fin'], errors='coerce')
+
+# Eliminar filas donde la conversión falló
+df = df.dropna(subset=['Inicio', 'Fin'])
+
+# Crear columnas para hover
 df['Inicio_str'] = df['Inicio'].dt.strftime('%Y-%m-%d')
 df['Fin_str'] = df['Fin'].dt.strftime('%Y-%m-%d')
 
-df = df.sort_values(by='Inicio', ascending=True).reset_index(drop=True)
+# Ordenar y resetear índice
+df = df.sort_values(by='Inicio').reset_index(drop=True)
+
+# Calcular duración y mes
 df['Duracion'] = (df['Fin'] - df['Inicio']).dt.days
 df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
 
-# Acortar nombres de RN
-df['RN_short'] = df['RN'].str[:20] + ('...' if df['RN'].str.len().max() > 20 else '')
+# Acortar nombres RN
+df['RN_short'] = df['RN'].str.slice(0, 20) + df['RN'].apply(lambda x: '...' if len(str(x)) > 20 else '')
 
-# 3. Colores personalizados por Estado
+# Colores personalizados
 color_estado = {
     'Entregado': 'green',
     'En desarrollo': 'teal',
@@ -48,11 +58,10 @@ color_estado = {
     'Para escribir': 'red'
 }
 
-# 4. Crear la app Dash
+# Crear app Dash
 app = Dash(__name__)
 server = app.server
 
-# 5. Layout de la app
 app.layout = html.Div([
     html.H1("Gantt Desarrollo Postventa", style={'textAlign': 'center'}),
     
@@ -65,7 +74,7 @@ app.layout = html.Div([
             value='Todos'
         )
     ], style={'width': '48%', 'display': 'inline-block'}),
-
+    
     html.Div([
         html.Label("Seleccionar Estado:"),
         dcc.Dropdown(
@@ -74,22 +83,19 @@ app.layout = html.Div([
             value='Todos'
         )
     ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'}),
-
+    
     dcc.Graph(id='gantt-graph')
 ])
 
-# 6. Callback modificado
 @app.callback(
     Output('gantt-graph', 'figure'),
     [Input('mes-dropdown', 'value'),
      Input('estado-dropdown', 'value')]
 )
 def actualizar_gantt(mes_seleccionado, estado_seleccionado):
-    # Filtrar datos
     df_filtrado = df if mes_seleccionado == 'Todos' else df[df['Mes'] == mes_seleccionado]
     df_filtrado = df_filtrado if estado_seleccionado == 'Todos' else df_filtrado[df_filtrado['Estado'] == estado_seleccionado]
 
-    # Crear figura
     fig = px.timeline(
         df_filtrado,
         x_start="Inicio",
@@ -103,7 +109,6 @@ def actualizar_gantt(mes_seleccionado, estado_seleccionado):
         text="RN_short"
     )
 
-    # Personalización del hover
     fig.update_traces(
         hovertemplate=(
             "<b>RN: %{customdata[0]}</b><br>"
@@ -116,7 +121,6 @@ def actualizar_gantt(mes_seleccionado, estado_seleccionado):
         textfont=dict(size=11, color='black')
     )
 
-    # Configuración del layout actualizada
     fig.update_layout(
         height=750,
         xaxis_title="Fecha",
@@ -137,6 +141,5 @@ def actualizar_gantt(mes_seleccionado, estado_seleccionado):
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080)
-
 
 
