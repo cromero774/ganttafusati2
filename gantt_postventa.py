@@ -91,7 +91,6 @@ app.layout = html.Div([
         ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'})
     ], style={'marginBottom': '20px'}),
 
-    # Div con scroll vertical
     html.Div([
         dcc.Graph(id='gantt-graph')
     ], style={'height': '80vh', 'overflowY': 'auto'})
@@ -139,19 +138,35 @@ def actualizar_grafico(mes, estado):
         marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
     )
 
+    # Calcular altura basada en la cantidad de elementos, pero con un mínimo fijo
+    # Para evitar que el gráfico se haga demasiado pequeño
+    min_height = 500  # Altura mínima en píxeles
+    dynamic_height = 25 * len(df_filtrado)
+    graph_height = max(min_height, dynamic_height)
+
     fig.update_layout(
-        height=25 * len(df_filtrado),  # barras finas
+        height=graph_height,
         yaxis=dict(
             title="",
-            showticklabels=False,  # oculta el eje Y
+            showticklabels=False,
             showgrid=False,
-            zeroline=False
+            zeroline=False,
+            autorange=False,
+            categoryorder='array',
+            categoryarray=df_filtrado['RN'][::-1]  # más antiguos arriba
         ),
         xaxis=dict(title="Fecha", tickformat="%Y-%m-%d"),
-        legend=dict(title="Estado", orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        legend=dict(
+            title="Estado",
+            orientation="v",
+            yanchor="top",
+            y=1,
+            xanchor="left",
+            x=1.01
+        ),
         plot_bgcolor='white',
         paper_bgcolor='white',
-        margin=dict(l=20, r=20, t=80, b=20),
+        margin=dict(l=20, r=200, t=80, b=20),  # margen derecho para leyenda
         bargap=0.1,
         uniformtext=dict(minsize=10, mode='show')
     )
