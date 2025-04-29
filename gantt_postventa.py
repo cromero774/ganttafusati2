@@ -111,13 +111,13 @@ def actualizar_grafico(mes, estado):
         return px.scatter(title="Sin datos con los filtros seleccionados")
 
     df_filtrado = df_filtrado.sort_values('Inicio', ascending=True)
-    df_filtrado['RN_unico'] = df_filtrado['RN'] + ' [' + df_filtrado.index.astype(str) + ']'
+    df_filtrado['y_id'] = df_filtrado.index.astype(str)
 
     fig = px.timeline(
         df_filtrado,
         x_start="Inicio",
         x_end="Fin",
-        y="RN_unico",
+        y="y_id",
         color="Estado",
         color_discrete_map=color_estado,
         custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
@@ -132,7 +132,7 @@ def actualizar_grafico(mes, estado):
             "Fin: %{customdata[2]}<br>"
             "Duración: %{customdata[3]} días"
         ),
-        text=df_filtrado['RN'],
+        text=df_filtrado["RN"],
         textposition='inside',
         insidetextanchor='middle',
         textfont=dict(size=12, color='black'),
@@ -149,7 +149,7 @@ def actualizar_grafico(mes, estado):
         zeroline=False,
         autorange=False,
         categoryorder='array',
-        categoryarray=df_filtrado['RN_unico'][::-1]
+        categoryarray=df_filtrado['y_id'][::-1]
     )
 
     fig.update_layout(
@@ -176,6 +176,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
