@@ -110,18 +110,16 @@ def actualizar_grafico(mes, estado):
     if df_filtrado.empty:
         return px.scatter(title="Sin datos con los filtros seleccionados")
     
-    # Crear identificadores únicos para cada fila
-    df_filtrado['id_unico'] = df_filtrado.index.astype(str)
-    df_filtrado['RN_display'] = df_filtrado['RN']
-    df_filtrado['RN'] = df_filtrado['RN'] + '_' + df_filtrado['id_unico']
-    
+    # Crear identificador único para cada barra y usar el nombre original para mostrar
     df_filtrado = df_filtrado.sort_values('Inicio', ascending=True)
-
+    df_filtrado['y_id'] = df_filtrado.index.astype(str)
+    df_filtrado['RN_display'] = df_filtrado['RN']  # Nombre original
+    
     fig = px.timeline(
         df_filtrado,
         x_start="Inicio",
         x_end="Fin",
-        y="RN",
+        y="y_id",  # Eje Y único por fila
         color="Estado",
         color_discrete_map=color_estado,
         custom_data=["RN_display", "Inicio_str", "Fin_str", "Duracion"],
@@ -136,35 +134,35 @@ def actualizar_grafico(mes, estado):
             "Fin: %{customdata[2]}<br>"
             "Duración: %{customdata[3]} días"
         ),
-        text=df_filtrado['RN_display'],  # Usar el nombre original para mostrar
+        text=df_filtrado['RN_display'],
         textposition='inside',
         insidetextanchor='middle',
         textfont=dict(size=12, color='black'),
         marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
     )
 
-    # Calcular altura basada en la cantidad de elementos
-    # Ajustar para que el tamaño sea proporcional pero no excesivo
     rows_count = len(df_filtrado)
-    row_height = 20  # Altura por fila en píxeles (ajustada para ser más pequeña)
-    min_height = 400  # Altura mínima en píxeles
-    max_height = 1200  # Altura máxima en píxeles
-    
-    # Calcular altura dinámica pero limitada
+    row_height = 20
+    min_height = 400
+    max_height = 1200
     dynamic_height = row_height * rows_count
     graph_height = max(min_height, min(dynamic_height, max_height))
 
+    # Reemplazar etiquetas del eje Y por el nombre original
+    fig.update_yaxes(
+        title="",
+        showticklabels=True,
+        showgrid=False,
+        zeroline=False,
+        autorange=False,
+        categoryorder='array',
+        categoryarray=df_filtrado['y_id'][::-1],
+        tickvals=df_filtrado['y_id'],
+        ticktext=df_filtrado['RN_display']
+    )
+
     fig.update_layout(
         height=graph_height,
-        yaxis=dict(
-            title="",
-            showticklabels=False,
-            showgrid=False,
-            zeroline=False,
-            autorange=False,
-            categoryorder='array',
-            categoryarray=df_filtrado['RN'][::-1]  # más antiguos arriba
-        ),
         xaxis=dict(title="Fecha", tickformat="%Y-%m-%d"),
         legend=dict(
             title="Estado",
@@ -176,24 +174,21 @@ def actualizar_grafico(mes, estado):
         ),
         plot_bgcolor='white',
         paper_bgcolor='white',
-        margin=dict(l=20, r=200, t=80, b=20),  # margen derecho para leyenda
-        bargap=0.15,  # Espacio entre barras (aumentado para separar más las barras)
+        margin=dict(l=20, r=200, t=80, b=20),
+        bargap=0.15,
         uniformtext=dict(minsize=10, mode='show')
     )
-    
-    # Ajustar el rango del eje Y para controlar el alto de las barras
     if rows_count > 0:
-        # Añade espacio extra para evitar que las barras sean demasiado grandes
         fig.update_layout(
             yaxis_range=[-0.5, rows_count - 0.5]
         )
-    
     return fig
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
