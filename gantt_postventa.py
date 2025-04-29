@@ -78,7 +78,7 @@ app.layout = html.Div([
                 value='Todos',
                 clearable=False
             )
-        ], style={'width': '32%', 'display': 'inline-block'}),
+        ], style={'width': '48%', 'display': 'inline-block'}),
         html.Div([
             html.Label("Estado:"),
             dcc.Dropdown(
@@ -88,36 +88,22 @@ app.layout = html.Div([
                 value='Todos',
                 clearable=False
             )
-        ], style={'width': '32%', 'display': 'inline-block', 'marginLeft': '10px'}),
-        html.Div([
-            html.Label("Buscar RN:"),
-            dcc.Input(
-                id='search-input',
-                type='text',
-                placeholder='Ingrese nombre o código de RN',
-                style={'width': '100%', 'padding': '8px'}
-            )
-        ], style={'width': '32%', 'display': 'inline-block', 'marginLeft': '10px'})
+        ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'}),
     ], style={'marginBottom': '20px'}),
-
     html.Div([
-        html.Div([
-            html.Button(
-                "Exportar como PNG", 
-                id="btn-download", 
-                style={
-                    'backgroundColor': '#1abc9c',
-                    'color': 'white',
-                    'border': 'none',
-                    'padding': '8px 15px',
-                    'borderRadius': '4px',
-                    'cursor': 'pointer',
-                    'marginRight': '10px'
-                }
-            ),
-            html.Div(id='download-info', style={'display': 'inline-block', 'marginLeft': '10px', 'color': '#666'})
-        ], style={'marginBottom': '10px'}),
-        dcc.Graph(id='gantt-graph', config={'toImageButtonOptions': {'format': 'png', 'filename': 'gantt_postventa'}})
+        html.Label("Tema:"),
+        dcc.RadioItems(
+            id='theme-switch',
+            options=[
+                {'label': 'Claro', 'value': 'light'},
+                {'label': 'Oscuro', 'value': 'dark'}
+            ],
+            value='light',
+            labelStyle={'display': 'inline-block', 'marginRight': '15px'}
+        ),
+    ], style={'marginBottom': '20px'}),
+    html.Div([
+        dcc.Graph(id='gantt-graph')
     ], style={'height': '80vh', 'overflowY': 'auto'})
 ])
 
@@ -125,26 +111,31 @@ app.layout = html.Div([
     Output('gantt-graph', 'figure'),
     [Input('mes-dropdown', 'value'),
      Input('estado-dropdown', 'value'),
-     Input('search-input', 'value')]
+     Input('theme-switch', 'value')]
 )
-def actualizar_grafico(mes, estado, busqueda):
+def actualizar_grafico(mes, estado, theme):
     df_filtrado = df.copy()
     if mes != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['Mes'] == mes]
     if estado != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['Estado'] == estado]
-    
-    # Filtrar por búsqueda si se proporciona
-    if busqueda and len(busqueda) > 0:
-        df_filtrado = df_filtrado[df_filtrado['RN'].str.contains(busqueda, case=False)]
-    
+
     if df_filtrado.empty:
         return px.scatter(title="Sin datos con los filtros seleccionados")
-    
-    # Ordenar por fecha de inicio (más viejos arriba)
+
+    # Colores por tema
+    if theme == 'dark':
+        plot_bgcolor = '#23272f'
+        paper_bgcolor = '#23272f'
+        font_color = '#f0f0f0'
+        gridcolor = '#444'
+    else:
+        plot_bgcolor = 'white'
+        paper_bgcolor = 'white'
+        font_color = '#222'
+        gridcolor = '#eee'
+
     df_filtrado = df_filtrado.sort_values('Inicio', ascending=True)
-    
-    # Usar directamente RN como identificador del eje Y
     fig = px.timeline(
         df_filtrado,
         x_start="Inicio",
@@ -163,7 +154,7 @@ def actualizar_grafico(mes, estado, busqueda):
             "Inicio: %{customdata[1]}<br>"
             "Fin: %{customdata[2]}"
         ),
-        text="",  # Quitar el texto dentro de las barras
+        text="",
         marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
     )
 
@@ -174,24 +165,22 @@ def actualizar_grafico(mes, estado, busqueda):
     dynamic_height = row_height * rows_count
     graph_height = max(min_height, min(dynamic_height, max_height))
 
-    # Mostrar el eje Y con los nombres de RN
     fig.update_yaxes(
         visible=True,
         showticklabels=True,
         showgrid=True,
+        gridcolor=gridcolor,
         zeroline=False,
         autorange=False,
         categoryorder='array',
-        categoryarray=df_filtrado['RN'][::-1],  # Mantener el orden invertido
+        categoryarray=df_filtrado['RN'][::-1],
         title="Requerimiento"
     )
 
-    # Añadir línea vertical para la fecha actual
     today = pd.Timestamp.now().normalize()
-    
     fig.update_layout(
         height=graph_height,
-        xaxis=dict(title="Fecha", tickformat="%Y-%m-%d"),
+        xaxis=dict(title="Fecha", tickformat="%Y-%m-%d", gridcolor=gridcolor),
         legend=dict(
             title="Estado",
             orientation="v",
@@ -200,9 +189,10 @@ def actualizar_grafico(mes, estado, busqueda):
             xanchor="left",
             x=1.01
         ),
-        plot_bgcolor='white',
-        paper_bgcolor='white',
-        margin=dict(l=180, r=200, t=80, b=20),  # Aumentar margen izquierdo para los nombres
+        plot_bgcolor=plot_bgcolor,
+        paper_bgcolor=paper_bgcolor,
+        font=dict(color=font_color),
+        margin=dict(l=180, r=200, t=80, b=20),
         bargap=0.15,
         shapes=[
             dict(
@@ -225,22 +215,14 @@ def actualizar_grafico(mes, estado, busqueda):
         fig.update_layout(
             yaxis_range=[-0.5, rows_count - 0.5]
         )
-    
-    return fig
 
-@app.callback(
-    Output('download-info', 'children'),
-    [Input('btn-download', 'n_clicks')]
-)
-def download_notification(n_clicks):
-    if n_clicks:
-        return "Utilice el botón de descarga en la barra de herramientas del gráfico"
-    return ""
+    return fig
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
