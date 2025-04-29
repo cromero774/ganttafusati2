@@ -70,7 +70,7 @@ app.layout = html.Div([
     html.H1("Gantt Postventa", style={'textAlign': 'center', 'margin': '20px 0'}),
     html.Div([
         html.Div([
-            html.Label("Mes Finalización:"),
+            html.Label("Mes de entregable:"),
             dcc.Dropdown(
                 id='mes-dropdown',
                 options=[{'label': 'Todos', 'value': 'Todos'}] +
@@ -103,8 +103,12 @@ app.layout = html.Div([
         ),
     ], style={'marginBottom': '20px'}),
     html.Div([
-        dcc.Graph(id='gantt-graph')
-    ], style={'height': '80vh', 'overflowY': 'auto'})
+        dcc.Graph(
+            id='gantt-graph',
+            responsive=True,
+            style={'height': '100%', 'width': '100%'}
+        )
+    ], style={'height': '80vh', 'overflowY': 'auto', 'width': '100%'})
 ])
 
 @app.callback(
@@ -151,8 +155,9 @@ def actualizar_grafico(mes, estado, theme):
     fig.update_traces(
         hovertemplate=(
             "<b>%{customdata[0]}</b><br>"
-            "Inicio: %{customdata[1]}<br>"
-            "Fin: %{customdata[2]}"
+            "Inicio de desarrollo: %{customdata[1]}<br>"
+            "Fin de desarrollo: %{customdata[2]}<br>"
+            "Duración: %{customdata[3]} días"
         ),
         text="",
         marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
@@ -222,6 +227,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
