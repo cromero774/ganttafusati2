@@ -14,11 +14,8 @@ debug_print("Iniciando aplicación...")
 sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTRvUazuzfWjGl5VWuZJUJslZEf-PpYyHZ_5G2SXwPtu16R71mPSKVQTYjen9UBwQ/pub?gid=865145678&single=true&output=csv"
 
 try:
-    debug_print("Verificando acceso al CSV...")
     response = requests.get(sheet_url, timeout=15)
     response.raise_for_status()
-
-    debug_print("Leyendo CSV...")
     df = pd.read_csv(sheet_url)
     df.columns = df.columns.str.strip()
     df['RN'] = df['RN'].astype(str).str.replace(r'[\xa0\s]+', ' ', regex=True).str.strip()
@@ -28,7 +25,6 @@ try:
     df = df.dropna(subset=['Inicio', 'Fin'])
 
     if df.empty:
-        debug_print("No hay datos válidos, usando datos de ejemplo.")
         sample_dates = pd.date_range(start='2023-01-01', periods=3)
         df = pd.DataFrame({
             'RN': ['Ejemplo 1', 'Ejemplo 2', 'Ejemplo 3'],
@@ -43,7 +39,6 @@ try:
     df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
 
 except Exception as e:
-    debug_print(f"Error al cargar o procesar datos: {e}")
     sample_dates = pd.date_range(start='2023-01-01', periods=3)
     df = pd.DataFrame({
         'RN': ['Error - Sin datos', 'Ejemplo 2', 'Ejemplo 3'],
@@ -95,7 +90,11 @@ app.layout = html.Div([
             )
         ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'})
     ], style={'marginBottom': '20px'}),
-    dcc.Graph(id='gantt-graph', style={'height': '90vh'})
+
+    # Div con scroll vertical
+    html.Div([
+        dcc.Graph(id='gantt-graph')
+    ], style={'height': '80vh', 'overflowY': 'auto'})
 ])
 
 @app.callback(
@@ -136,27 +135,25 @@ def actualizar_grafico(mes, estado):
         text=df_filtrado['RN'],
         textposition='inside',
         insidetextanchor='middle',
-        textfont=dict(size=9, color='black'),
+        textfont=dict(size=12, color='black'),
         marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
     )
 
     fig.update_layout(
-        height=max(400, 25 * len(df_filtrado)),
+        height=25 * len(df_filtrado),  # barras finas
         yaxis=dict(
             title="",
-            autorange=False,
-            categoryorder='array',
-            categoryarray=df_filtrado['RN'][::-1],
-            tickfont=dict(size=10),
-            automargin=True
+            showticklabels=False,  # oculta el eje Y
+            showgrid=False,
+            zeroline=False
         ),
         xaxis=dict(title="Fecha", tickformat="%Y-%m-%d"),
         legend=dict(title="Estado", orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         plot_bgcolor='white',
         paper_bgcolor='white',
-        margin=dict(l=160, r=20, t=80, b=20),
+        margin=dict(l=20, r=20, t=80, b=20),
         bargap=0.1,
-        uniformtext=dict(minsize=7, mode='hide')
+        uniformtext=dict(minsize=10, mode='show')
     )
     return fig
 
@@ -164,6 +161,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
