@@ -138,11 +138,16 @@ def actualizar_grafico(mes, estado):
         marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
     )
 
-    # Calcular altura basada en la cantidad de elementos, pero con un mínimo fijo
-    # Para evitar que el gráfico se haga demasiado pequeño
-    min_height = 500  # Altura mínima en píxeles
-    dynamic_height = 25 * len(df_filtrado)
-    graph_height = max(min_height, dynamic_height)
+    # Calcular altura basada en la cantidad de elementos
+    # Ajustar para que el tamaño sea proporcional pero no excesivo
+    rows_count = len(df_filtrado)
+    row_height = 20  # Altura por fila en píxeles (ajustada para ser más pequeña)
+    min_height = 400  # Altura mínima en píxeles
+    max_height = 1200  # Altura máxima en píxeles
+    
+    # Calcular altura dinámica pero limitada
+    dynamic_height = row_height * rows_count
+    graph_height = max(min_height, min(dynamic_height, max_height))
 
     fig.update_layout(
         height=graph_height,
@@ -167,9 +172,17 @@ def actualizar_grafico(mes, estado):
         plot_bgcolor='white',
         paper_bgcolor='white',
         margin=dict(l=20, r=200, t=80, b=20),  # margen derecho para leyenda
-        bargap=0.1,
+        bargap=0.15,  # Espacio entre barras (aumentado para separar más las barras)
         uniformtext=dict(minsize=10, mode='show')
     )
+    
+    # Ajustar el rango del eje Y para controlar el alto de las barras
+    if rows_count > 0:
+        # Añade espacio extra para evitar que las barras sean demasiado grandes
+        fig.update_layout(
+            yaxis_range=[-0.5, rows_count - 0.5]
+        )
+    
     return fig
 
 if __name__ == '__main__':
