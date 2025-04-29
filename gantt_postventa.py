@@ -11,7 +11,6 @@ def debug_print(message):
 
 debug_print("Iniciando aplicación...")
 
-# URL del CSV publicado en Google Sheets
 sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTRvUazuzfWjGl5VWuZJUJslZEf-PpYyHZ_5G2SXwPtu16R71mPSKVQTYjen9UBwQ/pub?gid=865145678&single=true&output=csv"
 
 try:
@@ -22,15 +21,10 @@ try:
     debug_print("Leyendo CSV...")
     df = pd.read_csv(sheet_url)
     df.columns = df.columns.str.strip()
-
-    # Limpieza de caracteres especiales y espacios en RN
     df['RN'] = df['RN'].astype(str).str.replace(r'[\xa0\s]+', ' ', regex=True).str.strip()
 
-    # Procesar fechas
     for col in ['Inicio', 'Fin']:
         df[col] = pd.to_datetime(df[col], format='%m/%d/%Y', errors='coerce')
-
-    # Eliminar filas sin fechas válidas
     df = df.dropna(subset=['Inicio', 'Fin'])
 
     if df.empty:
@@ -43,12 +37,10 @@ try:
             'Fin': sample_dates + pd.Timedelta(days=30)
         })
 
-    # Preparar columnas para gráfico
     df['Inicio_str'] = df['Inicio'].dt.strftime('%Y-%m-%d')
     df['Fin_str'] = df['Fin'].dt.strftime('%Y-%m-%d')
     df['Duracion'] = (df['Fin'] - df['Inicio']).dt.days
     df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
-    df['RN_short'] = df['RN'].str.wrap(15).str.split('\n').str[0] + '...'
 
 except Exception as e:
     debug_print(f"Error al cargar o procesar datos: {e}")
@@ -61,8 +53,7 @@ except Exception as e:
         'Inicio_str': sample_dates.strftime('%Y-%m-%d'),
         'Fin_str': (sample_dates + pd.Timedelta(days=30)).strftime('%Y-%m-%d'),
         'Duracion': [30, 30, 30],
-        'Mes': sample_dates.strftime('%Y-%m'),
-        'RN_short': ['Error...', 'Ejemplo 2...', 'Ejemplo 3...']
+        'Mes': sample_dates.strftime('%Y-%m')
     })
 
 color_estado = {
@@ -104,7 +95,7 @@ app.layout = html.Div([
             )
         ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'})
     ], style={'marginBottom': '20px'}),
-    dcc.Graph(id='gantt-graph', style={'height': '75vh'})
+    dcc.Graph(id='gantt-graph', style={'height': '90vh'})
 ])
 
 @app.callback(
@@ -145,26 +136,27 @@ def actualizar_grafico(mes, estado):
         text=df_filtrado['RN'],
         textposition='inside',
         insidetextanchor='middle',
-        textfont=dict(size=10, color='black'),
-        marker=dict(line=dict(width=0.5, color='DarkSlateGrey'))
+        textfont=dict(size=9, color='black'),
+        marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
     )
 
     fig.update_layout(
-        height=max(800, 50 * len(df_filtrado)),
+        height=max(400, 25 * len(df_filtrado)),
         yaxis=dict(
             title="",
             autorange=False,
             categoryorder='array',
             categoryarray=df_filtrado['RN'][::-1],
+            tickfont=dict(size=10),
             automargin=True
         ),
         xaxis=dict(title="Fecha", tickformat="%Y-%m-%d"),
         legend=dict(title="Estado", orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         plot_bgcolor='white',
         paper_bgcolor='white',
-        margin=dict(l=150, r=20, t=80, b=20),
-        bargap=0.3,
-        uniformtext=dict(minsize=8, mode='hide')
+        margin=dict(l=160, r=20, t=80, b=20),
+        bargap=0.1,
+        uniformtext=dict(minsize=7, mode='hide')
     )
     return fig
 
@@ -172,6 +164,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
