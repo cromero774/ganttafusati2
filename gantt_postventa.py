@@ -110,7 +110,6 @@ def actualizar_grafico(mes, estado):
     if df_filtrado.empty:
         return px.scatter(title="Sin datos con los filtros seleccionados")
     
-    # Crear identificador único para cada barra y usar el nombre original para mostrar
     df_filtrado = df_filtrado.sort_values('Inicio', ascending=True)
     df_filtrado['y_id'] = df_filtrado.index.astype(str)
     df_filtrado['RN_display'] = df_filtrado['RN']  # Nombre original
@@ -119,7 +118,7 @@ def actualizar_grafico(mes, estado):
         df_filtrado,
         x_start="Inicio",
         x_end="Fin",
-        y="y_id",  # Eje Y único por fila
+        y="y_id",  # Identificador único para evitar superposición
         color="Estado",
         color_discrete_map=color_estado,
         custom_data=["RN_display", "Inicio_str", "Fin_str", "Duracion"],
@@ -134,31 +133,26 @@ def actualizar_grafico(mes, estado):
             "Fin: %{customdata[2]}<br>"
             "Duración: %{customdata[3]} días"
         ),
-        text=df_filtrado['RN_display'],
+        text=df_filtrado['RN_display'],  # Mostrar solo el nombre original
         textposition='inside',
         insidetextanchor='middle',
-        textfont=dict(size=12, color='black'),
+        textfont=dict(size=11, color='black'),
         marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
     )
 
     rows_count = len(df_filtrado)
-    row_height = 20
+    row_height = 25  # un poco más alto para mejor lectura
     min_height = 400
     max_height = 1200
     dynamic_height = row_height * rows_count
     graph_height = max(min_height, min(dynamic_height, max_height))
 
-    # Reemplazar etiquetas del eje Y por el nombre original
+    # Ocultar eje Y completamente
     fig.update_yaxes(
-        title="",
-        showticklabels=True,
+        visible=False,
+        showticklabels=False,
         showgrid=False,
-        zeroline=False,
-        autorange=False,
-        categoryorder='array',
-        categoryarray=df_filtrado['y_id'][::-1],
-        tickvals=df_filtrado['y_id'],
-        ticktext=df_filtrado['RN_display']
+        zeroline=False
     )
 
     fig.update_layout(
@@ -175,8 +169,8 @@ def actualizar_grafico(mes, estado):
         plot_bgcolor='white',
         paper_bgcolor='white',
         margin=dict(l=20, r=200, t=80, b=20),
-        bargap=0.15,
-        uniformtext=dict(minsize=10, mode='show')
+        bargap=0.2,
+        uniformtext=dict(minsize=10, mode='hide')  # Oculta texto si no cabe
     )
     if rows_count > 0:
         fig.update_layout(
@@ -188,6 +182,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
