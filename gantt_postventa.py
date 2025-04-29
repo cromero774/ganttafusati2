@@ -78,7 +78,7 @@ app.layout = html.Div([
                 value='Todos',
                 clearable=False
             )
-        ], style={'width': '48%', 'display': 'inline-block'}),
+        ], style={'width': '32%', 'display': 'inline-block'}),
         html.Div([
             html.Label("Estado:"),
             dcc.Dropdown(
@@ -88,25 +88,56 @@ app.layout = html.Div([
                 value='Todos',
                 clearable=False
             )
-        ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'})
+        ], style={'width': '32%', 'display': 'inline-block', 'marginLeft': '10px'}),
+        html.Div([
+            html.Label("Buscar RN:"),
+            dcc.Input(
+                id='search-input',
+                type='text',
+                placeholder='Ingrese nombre o código de RN',
+                style={'width': '100%', 'padding': '8px'}
+            )
+        ], style={'width': '32%', 'display': 'inline-block', 'marginLeft': '10px'})
     ], style={'marginBottom': '20px'}),
 
     html.Div([
-        dcc.Graph(id='gantt-graph')
+        html.Div([
+            html.Button(
+                "Exportar como PNG", 
+                id="btn-download", 
+                style={
+                    'backgroundColor': '#1abc9c',
+                    'color': 'white',
+                    'border': 'none',
+                    'padding': '8px 15px',
+                    'borderRadius': '4px',
+                    'cursor': 'pointer',
+                    'marginRight': '10px'
+                }
+            ),
+            html.Div(id='download-info', style={'display': 'inline-block', 'marginLeft': '10px', 'color': '#666'})
+        ], style={'marginBottom': '10px'}),
+        dcc.Graph(id='gantt-graph', config={'toImageButtonOptions': {'format': 'png', 'filename': 'gantt_postventa'}})
     ], style={'height': '80vh', 'overflowY': 'auto'})
 ])
 
 @app.callback(
     Output('gantt-graph', 'figure'),
     [Input('mes-dropdown', 'value'),
-     Input('estado-dropdown', 'value')]
+     Input('estado-dropdown', 'value'),
+     Input('search-input', 'value')]
 )
-def actualizar_grafico(mes, estado):
+def actualizar_grafico(mes, estado, busqueda):
     df_filtrado = df.copy()
     if mes != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['Mes'] == mes]
     if estado != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['Estado'] == estado]
+    
+    # Filtrar por búsqueda si se proporciona
+    if busqueda and len(busqueda) > 0:
+        df_filtrado = df_filtrado[df_filtrado['RN'].str.contains(busqueda, case=False)]
+    
     if df_filtrado.empty:
         return px.scatter(title="Sin datos con los filtros seleccionados")
     
@@ -130,8 +161,7 @@ def actualizar_grafico(mes, estado):
         hovertemplate=(
             "<b>%{customdata[0]}</b><br>"
             "Inicio: %{customdata[1]}<br>"
-            "Fin: %{customdata[2]}<br>"
-            "Duración: %{customdata[3]} días"
+            "Fin: %{customdata[2]}"
         ),
         text="",  # Quitar el texto dentro de las barras
         marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
@@ -156,6 +186,9 @@ def actualizar_grafico(mes, estado):
         title="Requerimiento"
     )
 
+    # Añadir línea vertical para la fecha actual
+    today = pd.Timestamp.now().normalize()
+    
     fig.update_layout(
         height=graph_height,
         xaxis=dict(title="Fecha", tickformat="%Y-%m-%d"),
@@ -170,7 +203,22 @@ def actualizar_grafico(mes, estado):
         plot_bgcolor='white',
         paper_bgcolor='white',
         margin=dict(l=180, r=200, t=80, b=20),  # Aumentar margen izquierdo para los nombres
-        bargap=0.15
+        bargap=0.15,
+        shapes=[
+            dict(
+                type='line',
+                x0=today,
+                y0=0,
+                x1=today,
+                y1=rows_count,
+                line=dict(
+                    color='red',
+                    width=2,
+                    dash='dash'
+                ),
+                name='Hoy'
+            )
+        ]
     )
 
     if rows_count > 0:
@@ -179,6 +227,15 @@ def actualizar_grafico(mes, estado):
         )
     
     return fig
+
+@app.callback(
+    Output('download-info', 'children'),
+    [Input('btn-download', 'n_clicks')]
+)
+def download_notification(n_clicks):
+    if n_clicks:
+        return "Utilice el botón de descarga en la barra de herramientas del gráfico"
+    return ""
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
