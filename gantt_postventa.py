@@ -66,18 +66,10 @@ color_estado = {
 app = Dash(__name__)
 server = app.server
 
-# Layout con estilos inline
+# Layout
 app.layout = html.Div([
-    html.H1("Gantt Postventa", style={
-        'textAlign': 'center', 
-        'margin': '20px 0',
-        'fontSize': '2rem',
-        '@media (max-width: 600px)': {
-            'fontSize': '1.5rem'
-        }
-    }),
+    html.H1("Gantt Postventa", style={'textAlign': 'center', 'margin': '20px 0', 'fontSize': '2rem'}),
     
-    # Contenedor de filtros
     html.Div([
         html.Div([
             html.Label("Mes Finalización:"),
@@ -89,16 +81,7 @@ app.layout = html.Div([
                 clearable=False,
                 style={'width': '100%'}
             )
-        ], style={
-            'width': '48%', 
-            'display': 'inline-block',
-            'verticalAlign': 'top',
-            '@media (max-width: 600px)': {
-                'width': '100%',
-                'marginLeft': '0',
-                'marginBottom': '10px'
-            }
-        }),
+        ], style={'width': '48%', 'display': 'inline-block', 'verticalAlign': 'top'}),
         
         html.Div([
             html.Label("Estado:"),
@@ -110,23 +93,9 @@ app.layout = html.Div([
                 clearable=False,
                 style={'width': '100%'}
             )
-        ], style={
-            'width': '48%', 
-            'display': 'inline-block', 
-            'marginLeft': '10px',
-            'verticalAlign': 'top',
-            '@media (max-width: 600px)': {
-                'width': '100%',
-                'marginLeft': '0'
-            }
-        }),
-    ], style={
-        'marginBottom': '20px', 
-        'display': 'flex',
-        'flexWrap': 'wrap'
-    }),
+        ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px', 'verticalAlign': 'top'}),
+    ], style={'marginBottom': '20px', 'display': 'flex', 'flexWrap': 'wrap'}),
     
-    # Selector de tema
     html.Div([
         html.Label("Tema:", style={'marginRight': '10px'}),
         dcc.RadioItems(
@@ -136,28 +105,14 @@ app.layout = html.Div([
                 {'label': 'Oscuro', 'value': 'dark'}
             ],
             value='light',
-            labelStyle={
-                'display': 'inline-block',
-                'marginRight': '15px',
-                'cursor': 'pointer'
-            },
+            labelStyle={'display': 'inline-block', 'marginRight': '15px', 'cursor': 'pointer'},
             inputStyle={'marginRight': '5px'},
         ),
     ], style={'marginBottom': '20px'}),
     
-    # Gráfico Gantt
     html.Div([
         dcc.Graph(id='gantt-graph')
-    ], style={
-        'height': '80vh',
-        'overflowY': 'auto',
-        'border': '1px solid #ddd',
-        'borderRadius': '5px',
-        'padding': '10px',
-        '@media (max-width: 600px)': {
-            'height': '70vh'
-        }
-    })
+    ], style={'height': '80vh', 'overflowY': 'auto', 'border': '1px solid #ddd', 'borderRadius': '5px', 'padding': '10px'})
 ])
 
 @app.callback(
@@ -173,10 +128,21 @@ def actualizar_grafico(mes, estado, theme):
     if estado != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['Estado'] == estado]
 
-    if df_filtrado.empty:
+    # Agrupar para barra única por RN
+    df_gantt = df_filtrado.groupby('RN').agg({
+        'Inicio': 'min',
+        'Fin': 'max',
+        'Estado': 'last',
+    }).reset_index()
+
+    df_gantt['Inicio_str'] = df_gantt['Inicio'].dt.strftime('%Y-%m-%d')
+    df_gantt['Fin_str'] = df_gantt['Fin'].dt.strftime('%Y-%m-%d')
+    df_gantt['Duracion'] = (df_gantt['Fin'] - df_gantt['Inicio']).dt.days
+
+    if df_gantt.empty:
         return px.scatter(title="Sin datos con los filtros seleccionados")
 
-    # Configuración de tema
+    # Tema
     if theme == 'dark':
         plot_bgcolor = '#23272f'
         paper_bgcolor = '#23272f'
@@ -188,9 +154,9 @@ def actualizar_grafico(mes, estado, theme):
         font_color = '#222'
         gridcolor = '#eee'
 
-    df_filtrado = df_filtrado.sort_values('Inicio', ascending=True)
+    df_gantt = df_gantt.sort_values('Inicio', ascending=True)
     fig = px.timeline(
-        df_filtrado,
+        df_gantt,
         x_start="Inicio",
         x_end="Fin",
         y="RN",
@@ -212,7 +178,7 @@ def actualizar_grafico(mes, estado, theme):
         marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
     )
 
-    rows_count = len(df_filtrado)
+    rows_count = len(df_gantt)
     row_height = 25
     min_height = 400
     max_height = 1200
@@ -227,7 +193,7 @@ def actualizar_grafico(mes, estado, theme):
         zeroline=False,
         autorange=False,
         categoryorder='array',
-        categoryarray=df_filtrado['RN'][::-1],
+        categoryarray=df_gantt['RN'][::-1],
         title="Requerimiento"
     )
 
@@ -235,8 +201,8 @@ def actualizar_grafico(mes, estado, theme):
     fig.update_layout(
         height=graph_height,
         xaxis=dict(
-            title="Fecha", 
-            tickformat="%Y-%m-%d", 
+            title="Fecha",
+            tickformat="%Y-%m-%d",
             gridcolor=gridcolor,
             rangeslider_visible=True
         ),
@@ -279,6 +245,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
