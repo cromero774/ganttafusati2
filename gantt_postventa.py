@@ -66,12 +66,12 @@ except Exception as e:
     })
 
 color_estado = {
-    'Entregado': '#2ecc71',       # Verde
-    'En desarrollo': '#1abc9c',   # Verde azulado
-    'Backlog': '#f1c40f',         # Amarillo
-    'Para refinar': '#f5d76e',    # Amarillo claro
-    'Escribiendo': '#e67e22',     # Naranja
-    'Para escribir': '#e74c3c',   # Rojo
+    'Entregado': '#2ecc71',
+    'En desarrollo': '#1abc9c',
+    'Backlog': '#f1c40f',
+    'Para refinar': '#f5d76e',
+    'Escribiendo': '#e67e22',
+    'Para escribir': '#e74c3c',
     'En Análisis': '#9b59b6',
     'Cancelado': '#95a5a6',
     'Error': '#e74c3c'
@@ -121,7 +121,6 @@ def actualizar_grafico(mes, estado):
     if df_filtrado.empty:
         return px.scatter(title="Sin datos con los filtros seleccionados")
 
-    # Ordenar por fecha de inicio ascendente (más antiguos arriba)
     df_filtrado = df_filtrado.sort_values('Inicio', ascending=True)
 
     fig = px.timeline(
@@ -143,7 +142,7 @@ def actualizar_grafico(mes, estado):
             "Fin: %{customdata[2]}<br>"
             "Duración: %{customdata[3]} días"
         ),
-        text=df_filtrado['RN_short'],
+        text=df_filtrado['RN'],
         textposition='inside',
         insidetextanchor='middle',
         textfont=dict(size=10, color='black'),
@@ -151,21 +150,21 @@ def actualizar_grafico(mes, estado):
     )
 
     fig.update_layout(
-        height=max(600, 40 * len(df_filtrado)),  # Altura dinámica para mostrar todas las barras
+        height=max(800, 50 * len(df_filtrado)),
         yaxis=dict(
             title="",
             autorange=False,
             categoryorder='array',
-            categoryarray=df_filtrado['RN'][::-1],  # Invertir para que más antiguos estén arriba
+            categoryarray=df_filtrado['RN'][::-1],
             automargin=True
         ),
         xaxis=dict(title="Fecha", tickformat="%Y-%m-%d"),
         legend=dict(title="Estado", orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         plot_bgcolor='white',
         paper_bgcolor='white',
-        margin=dict(l=150, r=20, t=80, b=20),  # Margen izquierdo amplio para nombres largos
+        margin=dict(l=150, r=20, t=80, b=20),
         bargap=0.3,
-        uniformtext=dict(minsize=8, mode='hide')  # Oculta texto si no cabe
+        uniformtext=dict(minsize=8, mode='hide')
     )
     return fig
 
@@ -173,6 +172,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
