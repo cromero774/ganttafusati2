@@ -110,18 +110,17 @@ def actualizar_grafico(mes, estado):
     if df_filtrado.empty:
         return px.scatter(title="Sin datos con los filtros seleccionados")
 
-    # Ordenar por fecha de inicio (más viejos arriba)
     df_filtrado = df_filtrado.sort_values('Inicio', ascending=True)
-    df_filtrado['RN_display'] = df_filtrado['RN']  # Usamos RN directamente como y
+    df_filtrado['RN_unico'] = df_filtrado['RN'] + ' [' + df_filtrado.index.astype(str) + ']'
 
     fig = px.timeline(
         df_filtrado,
         x_start="Inicio",
         x_end="Fin",
-        y="RN_display",  # Mostramos nombre del RN directamente
+        y="RN_unico",
         color="Estado",
         color_discrete_map=color_estado,
-        custom_data=["RN_display", "Inicio_str", "Fin_str", "Duracion"],
+        custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
         labels={'Estado': 'Estado'},
         title=f"Postventa - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
     )
@@ -133,7 +132,7 @@ def actualizar_grafico(mes, estado):
             "Fin: %{customdata[2]}<br>"
             "Duración: %{customdata[3]} días"
         ),
-        text=df_filtrado['RN_display'],
+        text=df_filtrado['RN'],
         textposition='inside',
         insidetextanchor='middle',
         textfont=dict(size=12, color='black'),
@@ -141,11 +140,7 @@ def actualizar_grafico(mes, estado):
     )
 
     rows_count = len(df_filtrado)
-    row_height = 25
-    min_height = 400
-    max_height = 1200
-    dynamic_height = row_height * rows_count
-    graph_height = max(min_height, min(dynamic_height, max_height))
+    graph_height = max(400, min(25 * rows_count, 1200))
 
     fig.update_yaxes(
         visible=False,
@@ -154,7 +149,7 @@ def actualizar_grafico(mes, estado):
         zeroline=False,
         autorange=False,
         categoryorder='array',
-        categoryarray=df_filtrado['RN_display'][::-1]
+        categoryarray=df_filtrado['RN_unico'][::-1]
     )
 
     fig.update_layout(
@@ -175,17 +170,13 @@ def actualizar_grafico(mes, estado):
         uniformtext=dict(minsize=10, mode='show')
     )
 
-    if rows_count > 0:
-        fig.update_layout(
-            yaxis_range=[-0.5, rows_count - 0.5]
-        )
-
     return fig
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
