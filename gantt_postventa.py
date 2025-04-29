@@ -109,7 +109,12 @@ def actualizar_grafico(mes, estado):
         df_filtrado = df_filtrado[df_filtrado['Estado'] == estado]
     if df_filtrado.empty:
         return px.scatter(title="Sin datos con los filtros seleccionados")
-
+    
+    # Crear identificadores únicos para cada fila
+    df_filtrado['id_unico'] = df_filtrado.index.astype(str)
+    df_filtrado['RN_display'] = df_filtrado['RN']
+    df_filtrado['RN'] = df_filtrado['RN'] + '_' + df_filtrado['id_unico']
+    
     df_filtrado = df_filtrado.sort_values('Inicio', ascending=True)
 
     fig = px.timeline(
@@ -119,7 +124,7 @@ def actualizar_grafico(mes, estado):
         y="RN",
         color="Estado",
         color_discrete_map=color_estado,
-        custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
+        custom_data=["RN_display", "Inicio_str", "Fin_str", "Duracion"],
         labels={'Estado': 'Estado'},
         title=f"Postventa - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
     )
@@ -131,7 +136,7 @@ def actualizar_grafico(mes, estado):
             "Fin: %{customdata[2]}<br>"
             "Duración: %{customdata[3]} días"
         ),
-        text=df_filtrado['RN'],
+        text=df_filtrado['RN_display'],  # Usar el nombre original para mostrar
         textposition='inside',
         insidetextanchor='middle',
         textfont=dict(size=12, color='black'),
