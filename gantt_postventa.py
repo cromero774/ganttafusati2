@@ -109,17 +109,16 @@ def actualizar_grafico(mes, estado):
         df_filtrado = df_filtrado[df_filtrado['Estado'] == estado]
     if df_filtrado.empty:
         return px.scatter(title="Sin datos con los filtros seleccionados")
-    
+
     # Ordenar por fecha de inicio (más viejos arriba)
     df_filtrado = df_filtrado.sort_values('Inicio', ascending=True)
-    df_filtrado['y_id'] = df_filtrado.index.astype(str)
-    df_filtrado['RN_display'] = df_filtrado['RN']  # Nombre original
-    
+    df_filtrado['RN_display'] = df_filtrado['RN']  # Usamos RN directamente como y
+
     fig = px.timeline(
         df_filtrado,
         x_start="Inicio",
         x_end="Fin",
-        y="y_id",  # Identificador único para cada barra
+        y="RN_display",  # Mostramos nombre del RN directamente
         color="Estado",
         color_discrete_map=color_estado,
         custom_data=["RN_display", "Inicio_str", "Fin_str", "Duracion"],
@@ -134,7 +133,7 @@ def actualizar_grafico(mes, estado):
             "Fin: %{customdata[2]}<br>"
             "Duración: %{customdata[3]} días"
         ),
-        text=df_filtrado['RN_display'],  # Mostrar nombre en la barra
+        text=df_filtrado['RN_display'],
         textposition='inside',
         insidetextanchor='middle',
         textfont=dict(size=12, color='black'),
@@ -148,7 +147,6 @@ def actualizar_grafico(mes, estado):
     dynamic_height = row_height * rows_count
     graph_height = max(min_height, min(dynamic_height, max_height))
 
-    # Invertir el orden vertical para que los más viejos estén arriba
     fig.update_yaxes(
         visible=False,
         showticklabels=False,
@@ -156,7 +154,7 @@ def actualizar_grafico(mes, estado):
         zeroline=False,
         autorange=False,
         categoryorder='array',
-        categoryarray=df_filtrado['y_id'][::-1]  # <- invertir orden aquí
+        categoryarray=df_filtrado['RN_display'][::-1]
     )
 
     fig.update_layout(
@@ -174,20 +172,21 @@ def actualizar_grafico(mes, estado):
         paper_bgcolor='white',
         margin=dict(l=20, r=200, t=80, b=20),
         bargap=0.15,
-        uniformtext=dict(minsize=10, mode='show')  # Mostrar texto siempre
+        uniformtext=dict(minsize=10, mode='show')
     )
 
     if rows_count > 0:
         fig.update_layout(
             yaxis_range=[-0.5, rows_count - 0.5]
         )
-    
+
     return fig
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
