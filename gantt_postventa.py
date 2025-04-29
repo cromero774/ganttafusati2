@@ -70,7 +70,7 @@ app.layout = html.Div([
     html.H1("Gantt Postventa", style={'textAlign': 'center', 'margin': '20px 0'}),
     html.Div([
         html.Div([
-            html.Label("Mes de entregable:"),
+            html.Label("Mes Finalización:"),
             dcc.Dropdown(
                 id='mes-dropdown',
                 options=[{'label': 'Todos', 'value': 'Todos'}] +
@@ -156,8 +156,7 @@ def actualizar_grafico(mes, estado, theme):
         hovertemplate=(
             "<b>%{customdata[0]}</b><br>"
             "Inicio de desarrollo: %{customdata[1]}<br>"
-            "Fin de desarrollo: %{customdata[2]}<br>"
-            "Duración: %{customdata[3]} días"
+            "Fin de desarrollo: %{customdata[2]}"
         ),
         text="",
         marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
@@ -227,6 +226,8 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
+
 
 
 
