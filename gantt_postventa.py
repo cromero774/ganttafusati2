@@ -112,18 +112,17 @@ def actualizar_grafico(mes, estado):
     
     # Ordenar por fecha de inicio (más viejos arriba)
     df_filtrado = df_filtrado.sort_values('Inicio', ascending=True)
-    df_filtrado['y_id'] = df_filtrado.index.astype(str)
-    df_filtrado['RN_display'] = df_filtrado['RN']  # Nombre original
     
+    # Usar directamente RN como identificador del eje Y
     fig = px.timeline(
         df_filtrado,
         x_start="Inicio",
         x_end="Fin",
-        y="y_id",  # Identificador único para cada barra
+        y="RN",
         color="Estado",
         color_discrete_map=color_estado,
-        custom_data=["RN_display", "Inicio_str", "Fin_str", "Duracion"],
-        labels={'Estado': 'Estado'},
+        custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
+        labels={'Estado': 'Estado', 'RN': 'Requerimiento'},
         title=f"Postventa - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
     )
 
@@ -134,10 +133,7 @@ def actualizar_grafico(mes, estado):
             "Fin: %{customdata[2]}<br>"
             "Duración: %{customdata[3]} días"
         ),
-        text=df_filtrado['RN_display'],  # Mostrar nombre en la barra
-        textposition='inside',
-        insidetextanchor='middle',
-        textfont=dict(size=12, color='black'),
+        text="",  # Quitar el texto dentro de las barras
         marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
     )
 
@@ -148,15 +144,16 @@ def actualizar_grafico(mes, estado):
     dynamic_height = row_height * rows_count
     graph_height = max(min_height, min(dynamic_height, max_height))
 
-    # Invertir el orden vertical para que los más viejos estén arriba
+    # Mostrar el eje Y con los nombres de RN
     fig.update_yaxes(
-        visible=False,
-        showticklabels=False,
-        showgrid=False,
+        visible=True,
+        showticklabels=True,
+        showgrid=True,
         zeroline=False,
         autorange=False,
         categoryorder='array',
-        categoryarray=df_filtrado['y_id'][::-1]  # <- invertir orden aquí
+        categoryarray=df_filtrado['RN'][::-1],  # Mantener el orden invertido
+        title="Requerimiento"
     )
 
     fig.update_layout(
@@ -172,9 +169,8 @@ def actualizar_grafico(mes, estado):
         ),
         plot_bgcolor='white',
         paper_bgcolor='white',
-        margin=dict(l=20, r=200, t=80, b=20),
-        bargap=0.15,
-        uniformtext=dict(minsize=10, mode='show')  # Mostrar texto siempre
+        margin=dict(l=180, r=200, t=80, b=20),  # Aumentar margen izquierdo para los nombres
+        bargap=0.15
     )
 
     if rows_count > 0:
