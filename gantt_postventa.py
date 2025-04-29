@@ -109,18 +109,20 @@ def actualizar_grafico(mes, estado):
         df_filtrado = df_filtrado[df_filtrado['Estado'] == estado]
     if df_filtrado.empty:
         return px.scatter(title="Sin datos con los filtros seleccionados")
-
+    
+    # Ordenar por fecha de inicio (más viejos arriba)
     df_filtrado = df_filtrado.sort_values('Inicio', ascending=True)
     df_filtrado['y_id'] = df_filtrado.index.astype(str)
-
+    df_filtrado['RN_display'] = df_filtrado['RN']  # Nombre original
+    
     fig = px.timeline(
         df_filtrado,
         x_start="Inicio",
         x_end="Fin",
-        y="y_id",
+        y="y_id",  # Identificador único para cada barra
         color="Estado",
         color_discrete_map=color_estado,
-        custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
+        custom_data=["RN_display", "Inicio_str", "Fin_str", "Duracion"],
         labels={'Estado': 'Estado'},
         title=f"Postventa - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
     )
@@ -132,7 +134,7 @@ def actualizar_grafico(mes, estado):
             "Fin: %{customdata[2]}<br>"
             "Duración: %{customdata[3]} días"
         ),
-        text=df_filtrado["RN"],
+        text=df_filtrado['RN_display'],  # Mostrar nombre en la barra
         textposition='inside',
         insidetextanchor='middle',
         textfont=dict(size=12, color='black'),
@@ -140,8 +142,13 @@ def actualizar_grafico(mes, estado):
     )
 
     rows_count = len(df_filtrado)
-    graph_height = max(400, min(25 * rows_count, 1200))
+    row_height = 25
+    min_height = 400
+    max_height = 1200
+    dynamic_height = row_height * rows_count
+    graph_height = max(min_height, min(dynamic_height, max_height))
 
+    # Invertir el orden vertical para que los más viejos estén arriba
     fig.update_yaxes(
         visible=False,
         showticklabels=False,
@@ -149,7 +156,7 @@ def actualizar_grafico(mes, estado):
         zeroline=False,
         autorange=False,
         categoryorder='array',
-        categoryarray=df_filtrado['y_id'][::-1]
+        categoryarray=df_filtrado['y_id'][::-1]  # <- invertir orden aquí
     )
 
     fig.update_layout(
@@ -167,9 +174,14 @@ def actualizar_grafico(mes, estado):
         paper_bgcolor='white',
         margin=dict(l=20, r=200, t=80, b=20),
         bargap=0.15,
-        uniformtext=dict(minsize=10, mode='show')
+        uniformtext=dict(minsize=10, mode='show')  # Mostrar texto siempre
     )
 
+    if rows_count > 0:
+        fig.update_layout(
+            yaxis_range=[-0.5, rows_count - 0.5]
+        )
+    
     return fig
 
 if __name__ == '__main__':
