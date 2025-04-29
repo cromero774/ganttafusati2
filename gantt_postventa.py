@@ -66,8 +66,18 @@ color_estado = {
 app = Dash(__name__)
 server = app.server
 
+# Layout con estilos inline
 app.layout = html.Div([
-    html.H1("Gantt Postventa", style={'textAlign': 'center', 'margin': '20px 0'}),
+    html.H1("Gantt Postventa", style={
+        'textAlign': 'center', 
+        'margin': '20px 0',
+        'fontSize': '2rem',
+        '@media (max-width: 600px)': {
+            'fontSize': '1.5rem'
+        }
+    }),
+    
+    # Contenedor de filtros
     html.Div([
         html.Div([
             html.Label("Mes Finalización:"),
@@ -76,9 +86,20 @@ app.layout = html.Div([
                 options=[{'label': 'Todos', 'value': 'Todos'}] +
                         [{'label': mes, 'value': mes} for mes in sorted(df['Mes'].unique())],
                 value='Todos',
-                clearable=False
+                clearable=False,
+                style={'width': '100%'}
             )
-        ], style={'width': '48%', 'display': 'inline-block'}),
+        ], style={
+            'width': '48%', 
+            'display': 'inline-block',
+            'verticalAlign': 'top',
+            '@media (max-width: 600px)': {
+                'width': '100%',
+                'marginLeft': '0',
+                'marginBottom': '10px'
+            }
+        }),
+        
         html.Div([
             html.Label("Estado:"),
             dcc.Dropdown(
@@ -86,12 +107,28 @@ app.layout = html.Div([
                 options=[{'label': 'Todos', 'value': 'Todos'}] +
                         [{'label': estado, 'value': estado} for estado in sorted(df['Estado'].unique())],
                 value='Todos',
-                clearable=False
+                clearable=False,
+                style={'width': '100%'}
             )
-        ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'}),
-    ], style={'marginBottom': '20px'}),
+        ], style={
+            'width': '48%', 
+            'display': 'inline-block', 
+            'marginLeft': '10px',
+            'verticalAlign': 'top',
+            '@media (max-width: 600px)': {
+                'width': '100%',
+                'marginLeft': '0'
+            }
+        }),
+    ], style={
+        'marginBottom': '20px', 
+        'display': 'flex',
+        'flexWrap': 'wrap'
+    }),
+    
+    # Selector de tema
     html.Div([
-        html.Label("Tema:"),
+        html.Label("Tema:", style={'marginRight': '10px'}),
         dcc.RadioItems(
             id='theme-switch',
             options=[
@@ -99,12 +136,28 @@ app.layout = html.Div([
                 {'label': 'Oscuro', 'value': 'dark'}
             ],
             value='light',
-            labelStyle={'display': 'inline-block', 'marginRight': '15px'}
+            labelStyle={
+                'display': 'inline-block',
+                'marginRight': '15px',
+                'cursor': 'pointer'
+            },
+            inputStyle={'marginRight': '5px'},
         ),
     ], style={'marginBottom': '20px'}),
+    
+    # Gráfico Gantt
     html.Div([
         dcc.Graph(id='gantt-graph')
-    ], style={'height': '80vh', 'overflowY': 'auto'})
+    ], style={
+        'height': '80vh',
+        'overflowY': 'auto',
+        'border': '1px solid #ddd',
+        'borderRadius': '5px',
+        'padding': '10px',
+        '@media (max-width: 600px)': {
+            'height': '70vh'
+        }
+    })
 ])
 
 @app.callback(
@@ -123,7 +176,7 @@ def actualizar_grafico(mes, estado, theme):
     if df_filtrado.empty:
         return px.scatter(title="Sin datos con los filtros seleccionados")
 
-    # Colores por tema
+    # Configuración de tema
     if theme == 'dark':
         plot_bgcolor = '#23272f'
         paper_bgcolor = '#23272f'
@@ -152,7 +205,8 @@ def actualizar_grafico(mes, estado, theme):
         hovertemplate=(
             "<b>%{customdata[0]}</b><br>"
             "Inicio: %{customdata[1]}<br>"
-            "Fin: %{customdata[2]}"
+            "Fin: %{customdata[2]}<br>"
+            "Duración: %{customdata[3]} días"
         ),
         text="",
         marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
@@ -180,7 +234,12 @@ def actualizar_grafico(mes, estado, theme):
     today = pd.Timestamp.now().normalize()
     fig.update_layout(
         height=graph_height,
-        xaxis=dict(title="Fecha", tickformat="%Y-%m-%d", gridcolor=gridcolor),
+        xaxis=dict(
+            title="Fecha", 
+            tickformat="%Y-%m-%d", 
+            gridcolor=gridcolor,
+            rangeslider_visible=True
+        ),
         legend=dict(
             title="Estado",
             orientation="v",
@@ -212,9 +271,7 @@ def actualizar_grafico(mes, estado, theme):
     )
 
     if rows_count > 0:
-        fig.update_layout(
-            yaxis_range=[-0.5, rows_count - 0.5]
-        )
+        fig.update_layout(yaxis_range=[-0.5, rows_count - 0.5])
 
     return fig
 
@@ -222,6 +279,8 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
+
 
 
 
