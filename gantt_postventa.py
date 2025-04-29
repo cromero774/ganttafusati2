@@ -47,7 +47,7 @@ try:
     df['Fin_str'] = df['Fin'].dt.strftime('%Y-%m-%d')
     df['Duracion'] = (df['Fin'] - df['Inicio']).dt.days
     df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
-    df['RN_short'] = df['RN'].str.wrap(20).str.split('\n').str[0] + '...'
+    df['RN_short'] = df['RN'].str.wrap(15).str.split('\n').str[0] + '...'  # Ajustado a 15 caracteres
 
 except Exception as e:
     debug_print(f"Error: {str(e)}")
@@ -64,17 +64,17 @@ except Exception as e:
         'RN_short': ['Error...', 'Muestra 1...', 'Muestra 2...']
     })
 
-# Paleta de colores mejorada
+# Paleta de colores personalizada
 color_estado = {
-    'Entregado': '#2ecc71',
-    'En desarrollo': '#3498db',
-    'Backlog': '#f1c40f',
-    'Para refinar': '#e67e22',
-    'Escribiendo': '#e74c3c',
-    'Para escribir': '#95a5a6',
-    'En Análisis': '#9b59b6',
-    'Cancelado': '#7f8c8d',
-    'Error': '#e74c3c'
+    'Entregado': '#2ecc71',       # Verde
+    'En desarrollo': '#1abc9c',   # Verde azulado
+    'Backlog': '#f1c40f',         # Amarillo
+    'Para refinar': '#f5d76e',    # Amarillo claro
+    'Escribiendo': '#e67e22',     # Naranja
+    'Para escribir': '#e74c3c',   # Rojo
+    'En Análisis': '#9b59b6',     # Púrpura (adicional)
+    'Cancelado': '#95a5a6',       # Gris (adicional)
+    'Error': '#e74c3c'            # Rojo para errores
 }
 
 # Configuración de la aplicación
@@ -127,6 +127,9 @@ def actualizar_grafico(mes, estado):
     if df_filtrado.empty:
         return px.scatter(title="Sin datos con los filtros seleccionados")
     
+    # Ordenar por fecha de inicio (más antiguos arriba)
+    df_filtrado = df_filtrado.sort_values('Inicio', ascending=False)  # Invertir para mostrar más antiguos arriba
+    
     fig = px.timeline(
         df_filtrado,
         x_start="Inicio",
@@ -139,7 +142,7 @@ def actualizar_grafico(mes, estado):
         title=f"Postventa - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
     )
     
-    # Ajustes de visualización (solución a problemas reportados en los resultados de búsqueda)
+    # Personalización del texto en barras
     fig.update_traces(
         hovertemplate=(
             "<b>%{customdata[0]}</b><br>"
@@ -147,18 +150,29 @@ def actualizar_grafico(mes, estado):
             "Fin: %{customdata[2]}<br>"
             "Duración: %{customdata[3]} días"
         ),
+        textposition='inside',
+        insidetextanchor='start',
+        text=df_filtrado['RN_short'],
+        textfont=dict(size=11, color='black'),
         marker=dict(line=dict(width=0.5, color='DarkSlateGrey'))
     )
     
     fig.update_layout(
         xaxis=dict(title="Fecha", tickformat="%Y-%m-%d"),
-        yaxis=dict(title="", autorange="reversed", automargin=True),
+        yaxis=dict(
+            title="",
+            autorange=False,  # Desactivar autorange para mantener el orden
+            categoryorder='array',  # Orden personalizado
+            categoryarray=df_filtrado['RN'][::-1],  # Invertir el orden para mostrar más antiguos arriba
+            automargin=True
+        ),
         legend=dict(title="Estado", orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         plot_bgcolor='white',
         paper_bgcolor='white',
         margin=dict(l=20, r=20, t=80, b=20),
         bargap=0.3,
-        height=600
+        height=600,
+        uniformtext=dict(minsize=9, mode='show')
     )
     
     return fig
