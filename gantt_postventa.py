@@ -127,7 +127,6 @@ def actualizar_grafico(mes, estado, theme):
     if df_filtrado.empty:
         return px.scatter(title="Sin datos con los filtros seleccionados")
 
-    # Colores por tema
     if theme == 'dark':
         plot_bgcolor = '#23272f'
         paper_bgcolor = '#23272f'
@@ -140,6 +139,8 @@ def actualizar_grafico(mes, estado, theme):
         gridcolor = '#eee'
 
     df_filtrado = df_filtrado.sort_values('Inicio', ascending=True)
+    df_filtrado['RN'] = pd.Categorical(df_filtrado['RN'], categories=df_filtrado['RN'], ordered=True)
+
     fig = px.timeline(
         df_filtrado,
         x_start="Inicio",
@@ -170,9 +171,11 @@ def actualizar_grafico(mes, estado, theme):
     graph_height = max(min_height, min(dynamic_height, max_height))
 
     today = pd.Timestamp.now().normalize()
+
     fig.update_layout(
         height=graph_height,
         xaxis=dict(title="Fecha", tickformat="%Y-%m-%d", gridcolor=gridcolor),
+        yaxis=dict(autorange="reversed"),  # ← Clave para invertir el eje Y
         legend=dict(
             title="Estado",
             orientation="v",
@@ -203,7 +206,7 @@ def actualizar_grafico(mes, estado, theme):
         annotations=[
             dict(
                 x=today,
-                y=rows_count - 0.5,
+                y=0.5,
                 xref='x',
                 yref='y',
                 text=f'Hoy: {today.strftime("%Y-%m-%d")}',
@@ -220,17 +223,13 @@ def actualizar_grafico(mes, estado, theme):
         ]
     )
 
-    if rows_count > 0:
-        fig.update_layout(
-            yaxis_range=[-0.5, rows_count - 0.5]
-        )
-
     return fig
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
