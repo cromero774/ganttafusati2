@@ -127,7 +127,7 @@ def actualizar_grafico(mes, estado, theme):
     if df_filtrado.empty:
         return px.scatter(title="Sin datos con los filtros seleccionados")
 
-    # Temas
+    # Colores por tema
     if theme == 'dark':
         plot_bgcolor = '#23272f'
         paper_bgcolor = '#23272f'
@@ -156,8 +156,7 @@ def actualizar_grafico(mes, estado, theme):
         hovertemplate=(
             "<b>%{customdata[0]}</b><br>"
             "Inicio de desarrollo: %{customdata[1]}<br>"
-            "Fin de desarrollo OK QA: %{customdata[2]}<br>"
-            "Duración: %{customdata[3]} días"
+            "Fin de desarrollo OK QA: %{customdata[2]}"
         ),
         text="",
         marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
@@ -170,21 +169,7 @@ def actualizar_grafico(mes, estado, theme):
     dynamic_height = row_height * rows_count
     graph_height = max(min_height, min(dynamic_height, max_height))
 
-    fig.update_yaxes(
-        visible=True,
-        showticklabels=True,
-        showgrid=True,
-        gridcolor=gridcolor,
-        zeroline=False,
-        autorange=False,
-        categoryorder='array',
-        categoryarray=df_filtrado['RN'][::-1],
-        title="Requerimiento"
-    )
-
     today = pd.Timestamp.now().normalize()
-    limite_objetivo = pd.Timestamp(today.replace(day=15))
-
     fig.update_layout(
         height=graph_height,
         xaxis=dict(title="Fecha", tickformat="%Y-%m-%d", gridcolor=gridcolor),
@@ -208,15 +193,11 @@ def actualizar_grafico(mes, estado, theme):
                 y0=0,
                 x1=today,
                 y1=rows_count,
-                line=dict(color='red', width=2, dash='dash')
-            ),
-            dict(
-                type='line',
-                x0=limite_objetivo,
-                y0=0,
-                x1=limite_objetivo,
-                y1=rows_count,
-                line=dict(color='blue', width=2, dash='dot')
+                line=dict(
+                    color='red',
+                    width=2,
+                    dash='dash'
+                )
             )
         ],
         annotations=[
@@ -235,22 +216,6 @@ def actualizar_grafico(mes, estado, theme):
                 bordercolor='red',
                 borderwidth=1,
                 opacity=0.9
-            ),
-            dict(
-                x=limite_objetivo,
-                y=rows_count - 0.5,
-                xref='x',
-                yref='y',
-                text='Límite objetivo',
-                showarrow=True,
-                arrowhead=7,
-                ax=0,
-                ay=-40,
-                font=dict(color='blue', size=12),
-                bgcolor='white',
-                bordercolor='blue',
-                borderwidth=1,
-                opacity=0.9
             )
         ]
     )
@@ -266,6 +231,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
