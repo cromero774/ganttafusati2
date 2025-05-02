@@ -11,6 +11,7 @@ def debug_print(message):
 
 debug_print("Iniciando aplicación...")
 
+# URL del NUEVO Excel (Google Sheets)
 sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6s9qMzmA_sJRko5EDggumO4sybGVq3n-uOmZOMj8CJDnHo9AWZeZOXZGz7cTg4XoqeiPDIgQP3QER/pub?output=csv"
 
 try:
@@ -64,7 +65,7 @@ color_estado = {
 }
 
 app = Dash(__name__)
-server = app.server
+server = app.server  # Necesario para el despliegue
 
 app.layout = html.Div([
     html.H1("Gantt Postventa", style={'textAlign': 'center', 'margin': '20px 0'}),
@@ -118,117 +119,35 @@ app.layout = html.Div([
      Input('theme-switch', 'value')]
 )
 def actualizar_grafico(mes, estado, theme):
-    df_filtrado = df.copy()
+    filtered_df = df.copy()
     if mes != 'Todos':
-        df_filtrado = df_filtrado[df_filtrado['Mes'] == mes]
+        filtered_df = filtered_df[filtered_df['Mes'] == mes]
     if estado != 'Todos':
-        df_filtrado = df_filtrado[df_filtrado['Estado'] == estado]
+        filtered_df = filtered_df[filtered_df['Estado'] == estado]
 
-    if df_filtrado.empty:
-        return px.scatter(title="Sin datos con los filtros seleccionados")
-
-    if theme == 'dark':
-        plot_bgcolor = '#23272f'
-        paper_bgcolor = '#23272f'
-        font_color = '#f0f0f0'
-        gridcolor = '#444'
-    else:
-        plot_bgcolor = 'white'
-        paper_bgcolor = 'white'
-        font_color = '#222'
-        gridcolor = '#eee'
-
-    df_filtrado = df_filtrado.sort_values('Inicio', ascending=True)
-    df_filtrado['RN'] = pd.Categorical(df_filtrado['RN'], categories=df_filtrado['RN'], ordered=True)
+    template = 'plotly_white' if theme == 'light' else 'plotly_dark'
 
     fig = px.timeline(
-        df_filtrado,
-        x_start="Inicio",
-        x_end="Fin",
-        y="RN",
-        color="Estado",
+        filtered_df,
+        x_start='Inicio',
+        x_end='Fin',
+        y='RN',
+        color='Estado',
         color_discrete_map=color_estado,
-        custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
-        labels={'Estado': 'Estado', 'RN': 'Requerimiento'},
-        title=f"Postventa - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
+        hover_data=['Inicio_str', 'Fin_str', 'Duracion', 'Estado'],
+        template=template
     )
-
-    fig.update_traces(
-        hovertemplate=(
-            "<b>%{customdata[0]}</b><br>"
-            "Inicio de desarrollo: %{customdata[1]}<br>"
-            "Fin de desarrollo OK QA: %{customdata[2]}"
-        ),
-        text="",
-        marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
-    )
-
-    rows_count = len(df_filtrado)
-    row_height = 25
-    min_height = 400
-    max_height = 1200
-    dynamic_height = row_height * rows_count
-    graph_height = max(min_height, min(dynamic_height, max_height))
-
-    today = pd.Timestamp.now().normalize()
-
-    fig.update_layout(
-        height=graph_height,
-        xaxis=dict(title="Fecha", tickformat="%Y-%m-%d", gridcolor=gridcolor),
-        yaxis=dict(autorange="reversed"),  # ← Clave para invertir el eje Y
-        legend=dict(
-            title="Estado",
-            orientation="v",
-            yanchor="top",
-            y=1,
-            xanchor="left",
-            x=1.01
-        ),
-        plot_bgcolor=plot_bgcolor,
-        paper_bgcolor=paper_bgcolor,
-        font=dict(color=font_color),
-        margin=dict(l=180, r=200, t=80, b=20),
-        bargap=0.15,
-        shapes=[
-            dict(
-                type='line',
-                x0=today,
-                y0=0,
-                x1=today,
-                y1=rows_count,
-                line=dict(
-                    color='red',
-                    width=2,
-                    dash='dash'
-                )
-            )
-        ],
-        annotations=[
-            dict(
-                x=today,
-                y=0.5,
-                xref='x',
-                yref='y',
-                text=f'Hoy: {today.strftime("%Y-%m-%d")}',
-                showarrow=True,
-                arrowhead=7,
-                ax=0,
-                ay=-40,
-                font=dict(color='red', size=12),
-                bgcolor='white',
-                bordercolor='red',
-                borderwidth=1,
-                opacity=0.9
-            )
-        ]
-    )
-
+    fig.update_yaxes(autorange="reversed")
+    fig.update_layout(margin=dict(l=20, r=20, t=40, b=20))
     return fig
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
+
+
 
 
 
