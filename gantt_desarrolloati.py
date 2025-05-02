@@ -4,6 +4,7 @@ from dash import Dash, dcc, html, Input, Output
 import sys
 import requests
 import os
+from datetime import datetime
 
 def debug_print(message):
     print(f"DEBUG: {message}", file=sys.stderr)
@@ -11,7 +12,6 @@ def debug_print(message):
 
 debug_print("Iniciando aplicación...")
 
-# URL del NUEVO Excel (Google Sheets)
 sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6s9qMzmA_sJRko5EDggumO4sybGVq3n-uOmZOMj8CJDnHo9AWZeZOXZGz7cTg4XoqeiPDIgQP3QER/pub?output=csv"
 
 try:
@@ -65,7 +65,7 @@ color_estado = {
 }
 
 app = Dash(__name__)
-server = app.server  # Necesario para el despliegue
+server = app.server
 
 app.layout = html.Div([
     html.H1("Gantt Postventa", style={'textAlign': 'center', 'margin': '20px 0'}),
@@ -109,7 +109,7 @@ app.layout = html.Div([
             responsive=True,
             style={'height': '100%', 'width': '100%'}
         )
-    ], style={'height': '80vh', 'overflowY': 'auto', 'width': '100%'})
+    ], style={'height': 'auto', 'overflowY': 'auto', 'width': '100%'})
 ])
 
 @app.callback(
@@ -137,14 +137,41 @@ def actualizar_grafico(mes, estado, theme):
         hover_data=['Inicio_str', 'Fin_str', 'Duracion', 'Estado'],
         template=template
     )
-    fig.update_yaxes(autorange="reversed")
-    fig.update_layout(margin=dict(l=20, r=20, t=40, b=20))
+    fig.update_yaxes(
+        autorange="reversed",
+        tickfont=dict(size=12),
+        automargin=True,
+        title_text="RN"
+    )
+
+    height_px = max(400, len(filtered_df) * 60)
+    fig.update_layout(
+        margin=dict(l=250, r=20, t=40, b=20),
+        height=height_px,
+        xaxis_title="Fechas",
+        yaxis_title="",
+        legend_title="Estado"
+    )
+
+    # Línea de la fecha actual
+    hoy = datetime.now().date()
+    fig.add_vline(
+        x=hoy,
+        line_dash="dash",
+        line_color="red",
+        annotation_text="Hoy",
+        annotation_position="top right",
+        opacity=0.8
+    )
+
     return fig
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
+
 
 
 
