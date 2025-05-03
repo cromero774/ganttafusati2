@@ -4,7 +4,7 @@ from dash import Dash, dcc, html, Input, Output
 import requests
 import sys
 
-# --- FunciÃ³n de debug ---
+# --- Función de debug ---
 def debug_print(message):
     print(f"DEBUG: {message}", file=sys.stderr)
     sys.stderr.flush()
@@ -29,9 +29,8 @@ try:
     debug_print(f"Columnas detectadas: {df.columns.tolist()}")
     debug_print(f"Primeras filas: {df.head(2).to_dict()}")
     
-    # ConversiÃ³n de fechas con manejo explÃ­cito del formato
+    # Conversión de fechas con manejo explícito del formato
     for col in ['Inicio', 'Fin']:
-        # Intentar varios formatos de fecha, priorizando dÃ­a-mes-aÃ±o
         try:
             df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')
         except:
@@ -41,13 +40,13 @@ try:
                 try:
                     df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
                 except Exception as e:
-                    debug_print(f"Error en conversiÃ³n de fechas para columna {col}: {e}")
+                    debug_print(f"Error en conversión de fechas para columna {col}: {e}")
     
-    debug_print(f"Muestra de fechas despuÃ©s de conversiÃ³n: {df[['Inicio', 'Fin']].head(3)}")
+    debug_print(f"Muestra de fechas después de conversión: {df[['Inicio', 'Fin']].head(3)}")
     
-    # Eliminar filas con fechas invÃ¡lidas
+    # Eliminar filas con fechas inválidas
     df = df.dropna(subset=['Inicio', 'Fin'])
-    debug_print(f"Filas restantes despuÃ©s de eliminar NaT: {len(df)}")
+    debug_print(f"Filas restantes después de eliminar NaT: {len(df)}")
     
     # Crear columnas adicionales
     df['Inicio_str'] = df['Inicio'].dt.strftime('%d-%m-%Y')
@@ -81,7 +80,7 @@ color_estado = {
     'Para refinar': '#f5d76e',
     'Escribiendo': '#e67e22',
     'Para escribir': '#e74c3c',
-    'En AnÃ¡lisis': '#9b59b6',
+    'En Análisis': '#9b59b6',
     'Cancelado': '#95a5a6',
     'Error': '#e74c3c'
 }
@@ -133,7 +132,6 @@ app.layout = html.Div([
         dcc.Graph(id='gantt-graph', style={'height': '80vh'})
     ]),
     
-    # AÃ±adir secciÃ³n de depuraciÃ³n
     html.Div(id='debug-info', style={'whiteSpace': 'pre-wrap', 'padding': '10px', 'border': '1px solid #ddd'})
 ])
 
@@ -158,7 +156,7 @@ def actualizar_grafico(mes, estado, theme):
     debug_info += f"Datos filtrados: {len(df_filtrado)} filas\n"
     
     if df_filtrado.empty:
-        debug_info += "Â¡No hay datos despuÃ©s del filtrado!"
+        debug_info += "¡No hay datos después del filtrado!"
         return px.scatter(title="Sin datos con los filtros seleccionados"), debug_info
 
     if theme == 'dark':
@@ -174,13 +172,12 @@ def actualizar_grafico(mes, estado, theme):
 
     df_filtrado = df_filtrado.sort_values('Inicio')
     
-    # Corregir el manejo de categorÃ­as
-    # En lugar de usar Categorical con categories=df_filtrado['RN_trunc'], creamos una lista ordenada
+    # Corregir el manejo de categorías
     rn_order = df_filtrado['RN_trunc'].unique().tolist()
     df_filtrado['RN_order'] = df_filtrado['RN_trunc'].map({rn: i for i, rn in enumerate(rn_order)})
     df_filtrado = df_filtrado.sort_values('RN_order')
 
-    debug_info += f"Estados Ãºnicos: {df_filtrado['Estado'].unique().tolist()}\n"
+    debug_info += f"Estados únicos: {df_filtrado['Estado'].unique().tolist()}\n"
     debug_info += f"Rango de fechas: {df_filtrado['Inicio'].min().strftime('%d-%m-%Y')} a {df_filtrado['Fin'].max().strftime('%d-%m-%Y')}\n"
 
     try:
@@ -192,13 +189,16 @@ def actualizar_grafico(mes, estado, theme):
             color="Estado",
             custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
             color_discrete_map=color_estado,
-            title=f"Postventa - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
+            title=f"ATI - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
         )
 
         fig.update_traces(
-            hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>DÃ­as: %{customdata[3]}",
+            hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>Días: %{customdata[3]}",
             marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
         )
+
+        # ----------- BARRAS MÁS CHICAS -----------
+        fig.update_traces(width=0.3)  # <---- Esta línea hace las barras más finas
 
         fig.update_layout(
             xaxis=dict(title="Fecha", tickformat="%d-%m-%Y", gridcolor=gridcolor),
@@ -216,16 +216,17 @@ def actualizar_grafico(mes, estado, theme):
             height=800
         )
         
-        debug_info += "GrÃ¡fico generado correctamente"
+        debug_info += "Gráfico generado correctamente"
         return fig, debug_info
     
     except Exception as e:
-        debug_info += f"Error al generar grÃ¡fico: {e}"
-        return px.scatter(title=f"Error al generar grÃ¡fico: {e}"), debug_info
+        debug_info += f"Error al generar gráfico: {e}"
+        return px.scatter(title=f"Error al generar gráfico: {e}"), debug_info
 
 # --- Ejecutar ---
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
+
 
 
 
