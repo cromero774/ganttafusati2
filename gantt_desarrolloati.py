@@ -3,6 +3,7 @@ import plotly.express as px
 from dash import Dash, dcc, html, Input, Output
 import requests
 import sys
+from datetime import datetime
 
 # --- Función de debug ---
 def debug_print(message):
@@ -132,11 +133,15 @@ def actualizar_grafico(mes, estado, theme):
         paper_bgcolor = '#23272f'
         font_color = '#f0f0f0'
         gridcolor = '#444'
+        fecha_actual_color = 'rgba(255, 255, 255, 0.1)'  # Color para fecha actual en tema oscuro
+        fecha_text_color = '#ffffff'
     else:
         plot_bgcolor = 'white'
         paper_bgcolor = 'white'
         font_color = '#222'
         gridcolor = '#eee'
+        fecha_actual_color = 'rgba(173, 216, 230, 0.3)'  # Color para fecha actual en tema claro
+        fecha_text_color = '#000000'
 
     df_filtrado = df_filtrado.sort_values('Inicio')
     rn_order = df_filtrado['RN_trunc'].unique().tolist()
@@ -158,6 +163,46 @@ def actualizar_grafico(mes, estado, theme):
         fig.update_traces(
             hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>Días: %{customdata[3]}",
             marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
+        )
+
+        # Obtener la fecha actual
+        fecha_actual = datetime.now()
+        
+        # Formatear fecha para mostrar en la anotación
+        fecha_actual_str = fecha_actual.strftime('%d-%m-%Y')
+        
+        # Añadir un área sombreada para la fecha actual
+        fig.add_shape(
+            type="rect",
+            x0=fecha_actual,
+            x1=fecha_actual,
+            y0=0,
+            y1=len(rn_order) - 0.5,
+            xref="x",
+            yref="y",
+            fillcolor=fecha_actual_color,
+            opacity=1,
+            layer="below",
+            line_width=0,
+            width=16  # Ancho del área sombreada en horas (para que sea visible pero no demasiado intrusivo)
+        )
+        
+        # Añadir anotación para la fecha actual
+        fig.add_annotation(
+            x=fecha_actual,
+            y=0,
+            text=f"HOY: {fecha_actual_str}",
+            showarrow=False,
+            yshift=10,
+            xshift=0,
+            xanchor="center",
+            yanchor="bottom",
+            font=dict(color=fecha_text_color, size=10),
+            bgcolor=fecha_actual_color,
+            bordercolor=fecha_text_color,
+            borderwidth=1,
+            borderpad=4,
+            opacity=0.8
         )
 
         fig.update_layout(
