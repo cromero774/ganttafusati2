@@ -111,7 +111,8 @@ app.layout = html.Div([
                 options=[{'label': 'Todos', 'value': 'Todos'}] +
                         [{'label': estado, 'value': estado} for estado in sorted(df['Estado'].unique())],
                 value='Todos',
-                clearable=False
+                clearable=False,
+                multi=True
             )
         ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'}),
     ], style={'marginBottom': '20px'}),
@@ -145,15 +146,20 @@ app.layout = html.Div([
     Input('estado-dropdown', 'value'),
     Input('theme-switch', 'value')
 )
-def actualizar_grafico(mes, estado, theme):
+def actualizar_grafico(mes, estados, theme):
     df_filtrado = df.copy()
     debug_info = f"Datos cargados: {len(df)} filas\n"
-    debug_info += f"Filtros: Mes={mes}, Estado={estado}\n"
+    debug_info += f"Filtros: Mes={mes}, Estados={estados}\n"
     
     if mes != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['Mes'] == mes]
-    if estado != 'Todos':
-        df_filtrado = df_filtrado[df_filtrado['Estado'] == estado]
+    
+    # Gestionar filtrado de estados múltiples
+    if isinstance(estados, list):
+        if 'Todos' not in estados and estados:  # Si hay estados seleccionados y no incluye 'Todos'
+            df_filtrado = df_filtrado[df_filtrado['Estado'].isin(estados)]
+    elif estados != 'Todos':
+        df_filtrado = df_filtrado[df_filtrado['Estado'] == estados]
     
     debug_info += f"Datos filtrados: {len(df_filtrado)} filas\n"
     
@@ -184,6 +190,15 @@ def actualizar_grafico(mes, estado, theme):
     debug_info += f"Rango de fechas: {df_filtrado['Inicio'].min().strftime('%d-%m-%Y')} a {df_filtrado['Fin'].max().strftime('%d-%m-%Y')}\n"
 
     try:
+        # Formatear título para estados múltiples
+        if isinstance(estados, list):
+            if 'Todos' in estados or not estados:
+                estado_titulo = 'Todos los estados'
+            else:
+                estado_titulo = ', '.join(estados)
+        else:
+            estado_titulo = estados if estados != 'Todos' else 'Todos los estados'
+        
         fig = px.timeline(
             df_filtrado,
             x_start="Inicio",
@@ -192,12 +207,15 @@ def actualizar_grafico(mes, estado, theme):
             color="Estado",
             custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
             color_discrete_map=color_estado,
-            title=f"Postventa - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
+            title=f"Postventa - {estado_titulo} | {mes if mes != 'Todos' else 'Todos los meses'}"
         )
 
+        # Hacer las barras más estrechas
         fig.update_traces(
             hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>Días: %{customdata[3]}",
-            marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
+            marker=dict(line=dict(width=0.3, color='DarkSlateGrey')),
+            # Reducir el ancho de las barras
+            height=0.4  # Valor entre 0 y 1, donde valores más pequeños hacen barras más estrechas
         )
 
         fig.update_layout(
@@ -206,14 +224,19 @@ def actualizar_grafico(mes, estado, theme):
                 autorange="reversed", 
                 title="Requerimiento",
                 categoryorder='array',
-                categoryarray=rn_order
+                categoryarray=rn_order,
+                # Aumentar espacio entre barras
+                range=[-0.5, len(rn_order) - 0.5],  # Ajustar el rango para dar más espacio
             ),
             plot_bgcolor=plot_bgcolor,
             paper_bgcolor=paper_bgcolor,
             font=dict(color=font_color),
             legend=dict(title="Estado", x=1.01, y=1),
             margin=dict(l=20, r=250, t=50, b=50),
-            height=800
+            height=800,
+            # Ajustes adicionales para mejorar la visualización
+            barmode='overlay',
+            bargap=0.25  # Espacio entre barras de diferentes categorías
         )
         
         debug_info += "Gráfico generado correctamente"
