@@ -161,7 +161,7 @@ def actualizar_grafico(mes, estado, theme):
         )
 
         fig.update_traces(
-            hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>Días: %{customdata[3]}",
+            hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}",
             marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
         )
 
