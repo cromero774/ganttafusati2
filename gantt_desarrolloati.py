@@ -1,7 +1,6 @@
 import pandas as pd
 import plotly.express as px
 from dash import Dash, dcc, html, Input, Output
-import requests
 import datetime
 
 # Carga de datos
@@ -9,8 +8,16 @@ sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6s9qMzmA_sJRko5ED
 df = pd.read_csv(sheet_url, encoding='utf-8')
 df.columns = df.columns.str.strip()
 df['RN'] = df['RN'].astype(str).str.strip()
-df['Inicio'] = pd.to_datetime(df['Inicio'], dayfirst=True, errors='coerce')
-df['Fin'] = pd.to_datetime(df['Fin'], dayfirst=True, errors='coerce')
+
+# Conversión robusta de fechas
+for col in ['Inicio', 'Fin']:
+    df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')
+
+# Verifica que las fechas se hayan convertido bien
+print("Columnas:", df.columns)
+print("Primeras filas:\n", df.head())
+print("Tipos de datos:\n", df.dtypes)
+
 df = df.dropna(subset=['Inicio', 'Fin'])
 df['Inicio_str'] = df['Inicio'].dt.strftime('%d-%m-%Y')
 df['Fin_str'] = df['Fin'].dt.strftime('%d-%m-%Y')
@@ -31,7 +38,7 @@ color_estado = {
 }
 
 app = Dash(__name__)
-server = app.server  # <--- NECESARIO PARA GUNICORN/RENDER/HEROKU
+server = app.server
 
 app.layout = html.Div([
     html.H1("Gantt desarrollo ATI", style={'textAlign': 'center'}),
@@ -169,6 +176,7 @@ def actualizar_grafico(mes, estados, theme):
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
+
 
 
 
