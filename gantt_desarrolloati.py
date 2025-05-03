@@ -31,6 +31,7 @@ color_estado = {
 }
 
 app = Dash(__name__)
+server = app.server  # <--- NECESARIO PARA GUNICORN/RENDER/HEROKU
 
 app.layout = html.Div([
     html.H1("Gantt desarrollo ATI", style={'textAlign': 'center'}),
@@ -168,6 +169,7 @@ def actualizar_grafico(mes, estados, theme):
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
+
 
 
 
