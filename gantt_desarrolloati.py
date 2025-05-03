@@ -3,6 +3,7 @@ import plotly.express as px
 from dash import Dash, dcc, html, Input, Output
 import requests
 import sys
+import datetime
 
 # --- Función de debug ---
 def debug_print(message):
@@ -132,11 +133,13 @@ def actualizar_grafico(mes, estado, theme):
         paper_bgcolor = '#23272f'
         font_color = '#f0f0f0'
         gridcolor = '#444'
+        current_date_color = 'red'
     else:
         plot_bgcolor = 'white'
         paper_bgcolor = 'white'
         font_color = '#222'
         gridcolor = '#eee'
+        current_date_color = 'red'
 
     df_filtrado = df_filtrado.sort_values('Inicio')
     rn_order = df_filtrado['RN_trunc'].unique().tolist()
@@ -158,6 +161,17 @@ def actualizar_grafico(mes, estado, theme):
         fig.update_traces(
             hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>Días: %{customdata[3]}",
             marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
+        )
+
+        # Línea de la fecha actual
+        today = datetime.datetime.today()
+        fig.add_vline(
+            x=today,
+            line_width=1,
+            line_dash="dot",
+            line_color=current_date_color,
+            annotation_text="Hoy",
+            annotation_position="top left"
         )
 
         fig.update_layout(
@@ -186,6 +200,7 @@ def actualizar_grafico(mes, estado, theme):
 # --- Ejecutar ---
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
+
 
 
 
