@@ -16,20 +16,13 @@ try:
     debug_print("Intentando cargar datos desde URL...")
     response = requests.get(sheet_url, timeout=15)
     response.raise_for_status()
-    
-    # Guardar datos para debugging
     debug_print(f"Respuesta recibida. Status code: {response.status_code}")
     debug_print(f"Primeros 200 caracteres: {response.text[:200]}")
-    
-    # Cargar CSV
     df = pd.read_csv(sheet_url, encoding='utf-8')
     df.columns = df.columns.str.strip()
     df['RN'] = df['RN'].astype(str).str.strip()
-    
     debug_print(f"Columnas detectadas: {df.columns.tolist()}")
     debug_print(f"Primeras filas: {df.head(2).to_dict()}")
-    
-    # Conversión de fechas con manejo explícito del formato
     for col in ['Inicio', 'Fin']:
         try:
             df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')
@@ -41,22 +34,16 @@ try:
                     df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
                 except Exception as e:
                     debug_print(f"Error en conversión de fechas para columna {col}: {e}")
-    
     debug_print(f"Muestra de fechas después de conversión: {df[['Inicio', 'Fin']].head(3)}")
-    
-    # Eliminar filas con fechas inválidas
     df = df.dropna(subset=['Inicio', 'Fin'])
     debug_print(f"Filas restantes después de eliminar NaT: {len(df)}")
-    
-    # Crear columnas adicionales
     df['Inicio_str'] = df['Inicio'].dt.strftime('%d-%m-%Y')
     df['Fin_str'] = df['Fin'].dt.strftime('%d-%m-%Y')
     df['Duracion'] = (df['Fin'] - df['Inicio']).dt.days
     df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
-    df['RN_trunc'] = df['RN'].apply(lambda x: x if len(x) <= 30 else x[:27] + '...')
-    
+    # --- RN en minúscula y truncado ---
+    df['RN_trunc'] = df['RN'].str.lower().apply(lambda x: x if len(x) <= 30 else x[:27] + '...')
     debug_print(f"DataFrame procesado. Forma final: {df.shape}")
-
 except Exception as e:
     debug_print(f"Error cargando datos: {e}")
     sample_dates = pd.date_range(start='2023-01-01', periods=3)
@@ -70,7 +57,7 @@ except Exception as e:
     df['Fin_str'] = df['Fin'].dt.strftime('%d-%m-%Y')
     df['Duracion'] = 30
     df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
-    df['RN_trunc'] = df['RN']
+    df['RN_trunc'] = df['RN'].str.lower()
 
 # --- Colores por estado ---
 color_estado = {
@@ -171,8 +158,6 @@ def actualizar_grafico(mes, estado, theme):
         gridcolor = '#eee'
 
     df_filtrado = df_filtrado.sort_values('Inicio')
-    
-    # Corregir el manejo de categorías
     rn_order = df_filtrado['RN_trunc'].unique().tolist()
     df_filtrado['RN_order'] = df_filtrado['RN_trunc'].map({rn: i for i, rn in enumerate(rn_order)})
     df_filtrado = df_filtrado.sort_values('RN_order')
@@ -194,11 +179,9 @@ def actualizar_grafico(mes, estado, theme):
 
         fig.update_traces(
             hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>Días: %{customdata[3]}",
-            marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
+            marker=dict(line=dict(width=0.3, color='DarkSlateGrey')),
+            width=0.3  # BARRAS MÁS FINAS
         )
-
-        # ----------- BARRAS MÁS CHICAS -----------
-        fig.update_traces(width=0.3)  # <---- Esta línea hace las barras más finas
 
         fig.update_layout(
             xaxis=dict(title="Fecha", tickformat="%d-%m-%Y", gridcolor=gridcolor),
@@ -206,7 +189,8 @@ def actualizar_grafico(mes, estado, theme):
                 autorange="reversed", 
                 title="Requerimiento",
                 categoryorder='array',
-                categoryarray=rn_order
+                categoryarray=rn_order,
+                tickfont=dict(size=10)  # LETRA MÁS CHICA EN EL EJE Y
             ),
             plot_bgcolor=plot_bgcolor,
             paper_bgcolor=paper_bgcolor,
@@ -226,6 +210,7 @@ def actualizar_grafico(mes, estado, theme):
 # --- Ejecutar ---
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
+
 
 
 
