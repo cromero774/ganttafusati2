@@ -1,56 +1,50 @@
 import pandas as pd
 import plotly.express as px
 from dash import Dash, dcc, html, Input, Output
-import sys
 import requests
-import os
+import sys
 
+# --- Función de debug ---
 def debug_print(message):
     print(f"DEBUG: {message}", file=sys.stderr)
     sys.stderr.flush()
 
-debug_print("Iniciando aplicación...")
-
+# --- Carga de datos ---
 sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6s9qMzmA_sJRko5EDggumO4sybGVq3n-uOmZOMj8CJDnHo9AWZeZOXZGz7cTg4XoqeiPDIgQP3QER/pub?output=csv"
 
 try:
     response = requests.get(sheet_url, timeout=15)
     response.raise_for_status()
-    df = pd.read_csv(sheet_url, encoding='utf-8')
+    df = pd.read_csv(sheet_url, dayfirst=True, encoding='utf-8')
     df.columns = df.columns.str.strip()
-    df['RN'] = df['RN'].astype(str).str.replace(r'[\xa0\s]+', ' ', regex=True).str.strip()
+    df['RN'] = df['RN'].astype(str).str.strip()
 
     for col in ['Inicio', 'Fin']:
-        df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')
+        df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
     df = df.dropna(subset=['Inicio', 'Fin'])
 
-    if df.empty:
-        sample_dates = pd.date_range(start='2023-01-01', periods=3)
-        df = pd.DataFrame({
-            'RN': ['Ejemplo 1', 'Ejemplo 2', 'Ejemplo 3'],
-            'Estado': ['En desarrollo', 'Entregado', 'Backlog'],
-            'Inicio': sample_dates,
-            'Fin': sample_dates + pd.Timedelta(days=30)
-        })
-
-    df['Inicio_str'] = df['Inicio'].dt.strftime('%Y-%m-%d')
-    df['Fin_str'] = df['Fin'].dt.strftime('%Y-%m-%d')
+    df['Inicio_str'] = df['Inicio'].dt.strftime('%d-%m-%Y')
+    df['Fin_str'] = df['Fin'].dt.strftime('%d-%m-%Y')
     df['Duracion'] = (df['Fin'] - df['Inicio']).dt.days
     df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
+    df['RN_trunc'] = df['RN'].apply(lambda x: x if len(x) <= 30 else x[:27] + '...')
 
 except Exception as e:
+    print(f"Error cargando datos: {e}")
     sample_dates = pd.date_range(start='2023-01-01', periods=3)
     df = pd.DataFrame({
         'RN': ['Error - Sin datos', 'Ejemplo 2', 'Ejemplo 3'],
         'Estado': ['Error', 'Error', 'Error'],
         'Inicio': sample_dates,
         'Fin': sample_dates + pd.Timedelta(days=30),
-        'Inicio_str': sample_dates.strftime('%Y-%m-%d'),
-        'Fin_str': (sample_dates + pd.Timedelta(days=30)).strftime('%Y-%m-%d'),
-        'Duracion': [30, 30, 30],
-        'Mes': sample_dates.strftime('%Y-%m')
     })
+    df['Inicio_str'] = df['Inicio'].dt.strftime('%d-%m-%Y')
+    df['Fin_str'] = df['Fin'].dt.strftime('%d-%m-%Y')
+    df['Duracion'] = 30
+    df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
+    df['RN_trunc'] = df['RN']
 
+# --- Colores por estado ---
 color_estado = {
     'Entregado': '#2ecc71',
     'En desarrollo': '#1abc9c',
@@ -63,11 +57,13 @@ color_estado = {
     'Error': '#e74c3c'
 }
 
+# --- App Dash ---
 app = Dash(__name__)
 server = app.server
 
+# --- Layout ---
 app.layout = html.Div([
-    html.H1("Gantt desarrollo ATI", style={'textAlign': 'center', 'margin': '20px 0'}),
+    html.H1("Gantt desarrollo ATI", style={'textAlign': 'center'}),
     html.Div([
         html.Div([
             html.Label("Mes de entrega:"),
@@ -90,6 +86,7 @@ app.layout = html.Div([
             )
         ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'}),
     ], style={'marginBottom': '20px'}),
+
     html.Div([
         html.Label("Tema:"),
         dcc.RadioItems(
@@ -99,23 +96,21 @@ app.layout = html.Div([
                 {'label': 'Oscuro', 'value': 'dark'}
             ],
             value='light',
-            labelStyle={'display': 'inline-block', 'marginRight': '15px'}
-        ),
-    ], style={'marginBottom': '20px'}),
-    html.Div([
-        dcc.Graph(
-            id='gantt-graph',
-            responsive=True,
-            style={'height': '100%', 'width': '100%'}
+            labelStyle={'display': 'inline-block', 'marginRight': '10px'}
         )
-    ], style={'height': '80vh', 'overflowY': 'auto', 'width': '100%'})
+    ], style={'marginBottom': '20px'}),
+
+    html.Div([
+        dcc.Graph(id='gantt-graph', style={'height': '80vh'})
+    ])
 ])
 
+# --- Callback ---
 @app.callback(
     Output('gantt-graph', 'figure'),
-    [Input('mes-dropdown', 'value'),
-     Input('estado-dropdown', 'value'),
-     Input('theme-switch', 'value')]
+    Input('mes-dropdown', 'value'),
+    Input('estado-dropdown', 'value'),
+    Input('theme-switch', 'value')
 )
 def actualizar_grafico(mes, estado, theme):
     df_filtrado = df.copy()
@@ -138,98 +133,41 @@ def actualizar_grafico(mes, estado, theme):
         font_color = '#222'
         gridcolor = '#eee'
 
-    df_filtrado = df_filtrado.sort_values('Inicio', ascending=True)
-    df_filtrado['RN_corto'] = df_filtrado['RN'].apply(lambda x: x if len(x) <= 30 else x[:27] + '...')
-    df_filtrado['RN_corto'] = pd.Categorical(df_filtrado['RN_corto'], categories=df_filtrado['RN_corto'], ordered=True)
+    df_filtrado = df_filtrado.sort_values('Inicio')
+    df_filtrado['RN_trunc'] = pd.Categorical(df_filtrado['RN_trunc'], categories=df_filtrado['RN_trunc'], ordered=True)
 
     fig = px.timeline(
         df_filtrado,
         x_start="Inicio",
         x_end="Fin",
-        y="RN_corto",
+        y="RN_trunc",
         color="Estado",
-        color_discrete_map=color_estado,
         custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
-        labels={'Estado': 'Estado', 'RN_corto': 'Requerimiento'},
+        color_discrete_map=color_estado,
         title=f"Postventa - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
     )
 
     fig.update_traces(
-        hovertemplate=(
-            "<b>%{customdata[0]}</b><br>"
-            "Inicio de desarrollo: %{customdata[1]}<br>"
-            "Fin de desarrollo OK QA: %{customdata[2]}"
-        ),
-        text="",
+        hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>Días: %{customdata[3]}",
         marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
     )
 
-    rows_count = len(df_filtrado)
-    row_height = 25
-    min_height = 400
-    max_height = 1200
-    dynamic_height = row_height * rows_count
-    graph_height = max(min_height, min(dynamic_height, max_height))
-
-    today = pd.Timestamp.now().normalize()
-
     fig.update_layout(
-        height=graph_height,
-        xaxis=dict(title="Fecha", tickformat="%Y-%m-%d", gridcolor=gridcolor),
+        xaxis=dict(title="Fecha", tickformat="%d-%m-%Y", gridcolor=gridcolor),
         yaxis=dict(autorange="reversed"),
-        legend=dict(
-            title="Estado",
-            orientation="v",
-            yanchor="top",
-            y=1,
-            xanchor="left",
-            x=1.01
-        ),
         plot_bgcolor=plot_bgcolor,
         paper_bgcolor=paper_bgcolor,
         font=dict(color=font_color),
-        margin=dict(l=180, r=200, t=80, b=20),
-        bargap=0.15,
-        shapes=[
-            dict(
-                type='line',
-                x0=today,
-                y0=0,
-                x1=today,
-                y1=rows_count,
-                line=dict(
-                    color='red',
-                    width=2,
-                    dash='dash'
-                )
-            )
-        ],
-        annotations=[
-            dict(
-                x=today,
-                y=0.5,
-                xref='x',
-                yref='y',
-                text=f'Hoy: {today.strftime("%Y-%m-%d")}',
-                showarrow=True,
-                arrowhead=7,
-                ax=0,
-                ay=-40,
-                font=dict(color='red', size=12),
-                bgcolor='white',
-                bordercolor='red',
-                borderwidth=1,
-                opacity=0.9
-            )
-        ]
+        legend=dict(title="Estado", x=1.01, y=1),
+        margin=dict(l=20, r=250, t=50, b=50)
     )
 
     return fig
 
+# --- Ejecutar ---
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    debug_print("Iniciando servidor...")
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(debug=False)
+
 
 
 
