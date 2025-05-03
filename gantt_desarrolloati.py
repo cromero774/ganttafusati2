@@ -4,6 +4,7 @@ from dash import Dash, dcc, html, Input, Output
 import sys
 import requests
 import os
+from io import StringIO  # <-- Necesario para leer el CSV desde response.text
 
 def debug_print(message):
     print(f"DEBUG: {message}", file=sys.stderr)
@@ -16,12 +17,16 @@ sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6s9qMzmA_sJRko5ED
 try:
     response = requests.get(sheet_url, timeout=15)
     response.raise_for_status()
-    df = pd.read_csv(sheet_url)
+    
+    # Leer el CSV desde el contenido de la respuesta
+    df = pd.read_csv(StringIO(response.text))
     df.columns = df.columns.str.strip()
     df['RN'] = df['RN'].astype(str).str.replace(r'[\xa0\s]+', ' ', regex=True).str.strip()
 
+    # Convertir columnas de fechas
     for col in ['Inicio', 'Fin']:
-        df[col] = pd.to_datetime(df[col], format='%m/%d/%Y', errors='coerce')
+        df[col] = pd.to_datetime(df[col], errors='coerce')  # ← Usamos detección automática de formato
+    
     df = df.dropna(subset=['Inicio', 'Fin'])
 
     if df.empty:
@@ -175,7 +180,7 @@ def actualizar_grafico(mes, estado, theme):
     fig.update_layout(
         height=graph_height,
         xaxis=dict(title="Fecha", tickformat="%Y-%m-%d", gridcolor=gridcolor),
-        yaxis=dict(autorange="reversed"),  # ← Clave para invertir el eje Y
+        yaxis=dict(autorange="reversed"),
         legend=dict(
             title="Estado",
             orientation="v",
@@ -229,6 +234,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
