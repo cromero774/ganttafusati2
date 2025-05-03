@@ -1,33 +1,79 @@
 import pandas as pd
 import plotly.express as px
 from dash import Dash, dcc, html, Input, Output
-import datetime
+import requests
+import sys
 
-# Cargar datos
+# --- FunciÃ³n de debug ---
+def debug_print(message):
+    print(f"DEBUG: {message}", file=sys.stderr)
+    sys.stderr.flush()
+
+# --- Carga de datos ---
 sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6s9qMzmA_sJRko5EDggumO4sybGVq3n-uOmZOMj8CJDnHo9AWZeZOXZGz7cTg4XoqeiPDIgQP3QER/pub?output=csv"
-df = pd.read_csv(sheet_url, encoding='utf-8')
-df.columns = df.columns.str.strip()
-df['RN'] = df['RN'].astype(str).str.strip()
 
-# Convertir fechas con dayfirst=True
-df['Inicio'] = pd.to_datetime(df['Inicio'], dayfirst=True, errors='coerce')
-df['Fin'] = pd.to_datetime(df['Fin'], dayfirst=True, errors='coerce')
+try:
+    debug_print("Intentando cargar datos desde URL...")
+    response = requests.get(sheet_url, timeout=15)
+    response.raise_for_status()
+    
+    # Guardar datos para debugging
+    debug_print(f"Respuesta recibida. Status code: {response.status_code}")
+    debug_print(f"Primeros 200 caracteres: {response.text[:200]}")
+    
+    # Cargar CSV
+    df = pd.read_csv(sheet_url, encoding='utf-8')
+    df.columns = df.columns.str.strip()
+    df['RN'] = df['RN'].astype(str).str.strip()
+    
+    debug_print(f"Columnas detectadas: {df.columns.tolist()}")
+    debug_print(f"Primeras filas: {df.head(2).to_dict()}")
+    
+    # ConversiÃ³n de fechas con manejo explÃ­cito del formato
+    for col in ['Inicio', 'Fin']:
+        # Intentar varios formatos de fecha, priorizando dÃ­a-mes-aÃ±o
+        try:
+            df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')
+        except:
+            try:
+                df[col] = pd.to_datetime(df[col], format='%d-%m-%Y', errors='coerce')
+            except:
+                try:
+                    df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
+                except Exception as e:
+                    debug_print(f"Error en conversiÃ³n de fechas para columna {col}: {e}")
+    
+    debug_print(f"Muestra de fechas despuÃ©s de conversiÃ³n: {df[['Inicio', 'Fin']].head(3)}")
+    
+    # Eliminar filas con fechas invÃ¡lidas
+    df = df.dropna(subset=['Inicio', 'Fin'])
+    debug_print(f"Filas restantes despuÃ©s de eliminar NaT: {len(df)}")
+    
+    # Crear columnas adicionales
+    df['Inicio_str'] = df['Inicio'].dt.strftime('%d-%m-%Y')
+    df['Fin_str'] = df['Fin'].dt.strftime('%d-%m-%Y')
+    df['Duracion'] = (df['Fin'] - df['Inicio']).dt.days
+    df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
+    df['RN_trunc'] = df['RN'].apply(lambda x: x if len(x) <= 30 else x[:27] + '...')
+    
+    debug_print(f"DataFrame procesado. Forma final: {df.shape}")
 
-# Mostrar info para debug
-print("Columnas:", df.columns.tolist())
-print("Primeras filas:\n", df.head())
-print("Tipos de datos:\n", df.dtypes)
+except Exception as e:
+    debug_print(f"Error cargando datos: {e}")
+    sample_dates = pd.date_range(start='2023-01-01', periods=3)
+    df = pd.DataFrame({
+        'RN': ['Error - Sin datos', 'Ejemplo 2', 'Ejemplo 3'],
+        'Estado': ['Error', 'Error', 'Error'],
+        'Inicio': sample_dates,
+        'Fin': sample_dates + pd.Timedelta(days=30),
+    })
+    df['Inicio_str'] = df['Inicio'].dt.strftime('%d-%m-%Y')
+    df['Fin_str'] = df['Fin'].dt.strftime('%d-%m-%Y')
+    df['Duracion'] = 30
+    df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
+    df['RN_trunc'] = df['RN']
 
-# Eliminar filas con fechas inválidas
-df = df.dropna(subset=['Inicio', 'Fin'])
-
-# Crear columnas auxiliares
-df['Inicio_str'] = df['Inicio'].dt.strftime('%d-%m-%Y')
-df['Fin_str'] = df['Fin'].dt.strftime('%d-%m-%Y')
-df['Duracion'] = (df['Fin'] - df['Inicio']).dt.days
-df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
-df['RN_trunc'] = df['RN'].apply(lambda x: x if len(x) <= 30 else x[:27] + '...')
-
+# --- Colores por estado ---
 color_estado = {
     'Entregado': '#2ecc71',
     'En desarrollo': '#1abc9c',
@@ -35,24 +81,25 @@ color_estado = {
     'Para refinar': '#f5d76e',
     'Escribiendo': '#e67e22',
     'Para escribir': '#e74c3c',
-    'En Análisis': '#9b59b6',
+    'En AnÃ¡lisis': '#9b59b6',
     'Cancelado': '#95a5a6',
     'Error': '#e74c3c'
 }
 
+# --- App Dash ---
 app = Dash(__name__)
 server = app.server
 
+# --- Layout ---
 app.layout = html.Div([
     html.H1("Gantt desarrollo ATI", style={'textAlign': 'center'}),
-    html.Div(f"Fecha actual: {datetime.datetime.now().strftime('%d-%m-%Y')}",
-             style={'textAlign': 'right', 'fontSize': '14px', 'color': '#888', 'marginBottom': '10px'}),
     html.Div([
         html.Div([
             html.Label("Mes de entrega:"),
             dcc.Dropdown(
                 id='mes-dropdown',
-                options=[{'label': 'Todos', 'value': 'Todos'}] + [{'label': m, 'value': m} for m in sorted(df['Mes'].unique())],
+                options=[{'label': 'Todos', 'value': 'Todos'}] +
+                        [{'label': mes, 'value': mes} for mes in sorted(df['Mes'].unique())],
                 value='Todos',
                 clearable=False
             )
@@ -61,13 +108,14 @@ app.layout = html.Div([
             html.Label("Estado:"),
             dcc.Dropdown(
                 id='estado-dropdown',
-                options=[{'label': 'Todos', 'value': 'Todos'}] + [{'label': e, 'value': e} for e in sorted(df['Estado'].unique())],
-                value=['Todos'],
-                multi=True,
+                options=[{'label': 'Todos', 'value': 'Todos'}] +
+                        [{'label': estado, 'value': estado} for estado in sorted(df['Estado'].unique())],
+                value='Todos',
                 clearable=False
             )
         ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'}),
     ], style={'marginBottom': '20px'}),
+
     html.Div([
         html.Label("Tema:"),
         dcc.RadioItems(
@@ -80,105 +128,102 @@ app.layout = html.Div([
             labelStyle={'display': 'inline-block', 'marginRight': '10px'}
         )
     ], style={'marginBottom': '20px'}),
-    dcc.Graph(id='gantt-graph', style={'height': '80vh'}),
-    html.Pre(id='debug-info', style={'whiteSpace': 'pre-wrap', 'padding': '10px', 'border': '1px solid #ddd'})
+
+    html.Div([
+        dcc.Graph(id='gantt-graph', style={'height': '80vh'})
+    ]),
+    
+    # AÃ±adir secciÃ³n de depuraciÃ³n
+    html.Div(id='debug-info', style={'whiteSpace': 'pre-wrap', 'padding': '10px', 'border': '1px solid #ddd'})
 ])
 
+# --- Callback ---
 @app.callback(
     [Output('gantt-graph', 'figure'),
      Output('debug-info', 'children')],
-    [Input('mes-dropdown', 'value'),
-     Input('estado-dropdown', 'value'),
-     Input('theme-switch', 'value')]
+    Input('mes-dropdown', 'value'),
+    Input('estado-dropdown', 'value'),
+    Input('theme-switch', 'value')
 )
-def actualizar_grafico(mes, estados, theme):
+def actualizar_grafico(mes, estado, theme):
     df_filtrado = df.copy()
-
+    debug_info = f"Datos cargados: {len(df)} filas\n"
+    debug_info += f"Filtros: Mes={mes}, Estado={estado}\n"
+    
     if mes != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['Mes'] == mes]
-
-    if isinstance(estados, list):
-        if 'Todos' not in estados:
-            df_filtrado = df_filtrado[df_filtrado['Estado'].isin(estados)]
-    else:
-        if estados != 'Todos':
-            df_filtrado = df_filtrado[df_filtrado['Estado'] == estados]
-
-    # Debug: verificar filas y columnas
-    print("Filas después de filtro:", len(df_filtrado))
-    print(df_filtrado[['RN_trunc', 'Inicio', 'Fin']].head())
-
+    if estado != 'Todos':
+        df_filtrado = df_filtrado[df_filtrado['Estado'] == estado]
+    
+    debug_info += f"Datos filtrados: {len(df_filtrado)} filas\n"
+    
     if df_filtrado.empty:
-        return px.scatter(title="No hay datos con los filtros seleccionados"), "No hay datos para mostrar con los filtros actuales."
+        debug_info += "Â¡No hay datos despuÃ©s del filtrado!"
+        return px.scatter(title="Sin datos con los filtros seleccionados"), debug_info
 
     if theme == 'dark':
         plot_bgcolor = '#23272f'
         paper_bgcolor = '#23272f'
         font_color = '#f0f0f0'
         gridcolor = '#444'
-        current_line_color = '#e74c3c'
     else:
         plot_bgcolor = 'white'
         paper_bgcolor = 'white'
         font_color = '#222'
         gridcolor = '#eee'
-        current_line_color = '#e74c3c'
 
+    df_filtrado = df_filtrado.sort_values('Inicio')
+    
+    # Corregir el manejo de categorÃ­as
+    # En lugar de usar Categorical con categories=df_filtrado['RN_trunc'], creamos una lista ordenada
     rn_order = df_filtrado['RN_trunc'].unique().tolist()
     df_filtrado['RN_order'] = df_filtrado['RN_trunc'].map({rn: i for i, rn in enumerate(rn_order)})
     df_filtrado = df_filtrado.sort_values('RN_order')
 
-    fig = px.timeline(
-        df_filtrado,
-        x_start="Inicio",
-        x_end="Fin",
-        y="RN_trunc",
-        color="Estado",
-        custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
-        color_discrete_map=color_estado,
-        title=f"Postventa - {', '.join(estados) if isinstance(estados, list) and 'Todos' not in estados else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
-    )
+    debug_info += f"Estados Ãºnicos: {df_filtrado['Estado'].unique().tolist()}\n"
+    debug_info += f"Rango de fechas: {df_filtrado['Inicio'].min().strftime('%d-%m-%Y')} a {df_filtrado['Fin'].max().strftime('%d-%m-%Y')}\n"
 
-    fig.update_traces(
-        hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>Días: %{customdata[3]}",
-        marker=dict(line=dict(width=0.3, color='DarkSlateGrey')),
-        width=0.3
-    )
+    try:
+        fig = px.timeline(
+            df_filtrado,
+            x_start="Inicio",
+            x_end="Fin",
+            y="RN_trunc",
+            color="Estado",
+            custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
+            color_discrete_map=color_estado,
+            title=f"Postventa - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
+        )
 
-    fecha_actual = datetime.datetime.now()
-    fig.add_vline(
-        x=fecha_actual,
-        line_width=2,
-        line_dash="dash",
-        line_color=current_line_color,
-        annotation_text="Hoy",
-        annotation_font_color=current_line_color,
-        annotation_bgcolor=plot_bgcolor
-    )
+        fig.update_traces(
+            hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>DÃ­as: %{customdata[3]}",
+            marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
+        )
 
-    fig.update_layout(
-        xaxis=dict(title="Fecha", tickformat="%d-%m-%Y", gridcolor=gridcolor),
-        yaxis=dict(
-            autorange="reversed",
-            title="Requerimiento",
-            categoryorder='array',
-            categoryarray=rn_order
-        ),
-        plot_bgcolor=plot_bgcolor,
-        paper_bgcolor=paper_bgcolor,
-        font=dict(color=font_color),
-        legend=dict(title="Estado", x=1.01, y=1),
-        margin=dict(l=20, r=250, t=50, b=50),
-        height=800
-    )
+        fig.update_layout(
+            xaxis=dict(title="Fecha", tickformat="%d-%m-%Y", gridcolor=gridcolor),
+            yaxis=dict(
+                autorange="reversed", 
+                title="Requerimiento",
+                categoryorder='array',
+                categoryarray=rn_order
+            ),
+            plot_bgcolor=plot_bgcolor,
+            paper_bgcolor=paper_bgcolor,
+            font=dict(color=font_color),
+            legend=dict(title="Estado", x=1.01, y=1),
+            margin=dict(l=20, r=250, t=50, b=50),
+            height=800
+        )
+        
+        debug_info += "GrÃ¡fico generado correctamente"
+        return fig, debug_info
+    
+    except Exception as e:
+        debug_info += f"Error al generar grÃ¡fico: {e}"
+        return px.scatter(title=f"Error al generar grÃ¡fico: {e}"), debug_info
 
-    debug_info = f"Datos filtrados: {len(df_filtrado)} filas\n"
-    debug_info += f"Estados únicos: {df_filtrado['Estado'].unique().tolist()}\n"
-    debug_info += f"Rango fechas: {df_filtrado['Inicio'].min().strftime('%d-%m-%Y')} a {df_filtrado['Fin'].max().strftime('%d-%m-%Y')}\n"
-    debug_info += "Gráfico generado correctamente."
-
-    return fig, debug_info
-
+# --- Ejecutar ---
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
 
