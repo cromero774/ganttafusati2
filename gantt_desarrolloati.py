@@ -118,7 +118,7 @@ app.layout = html.Div([
 )
 def actualizar_grafico(mes, estado, theme):
     df_filtrado = df.copy()
-    
+
     if mes != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['Mes'] == mes]
     if estado != 'Todos':
@@ -175,8 +175,7 @@ def actualizar_grafico(mes, estado, theme):
             font=dict(color=font_color),
             legend=dict(title="Estado", x=1.01, y=1),
             margin=dict(l=20, r=250, t=50, b=50),
-            height=800,
-            bargap=0  # Elimina separación vertical entre barras
+            height=max(400, 25 * len(df_filtrado))
         )
 
         return fig
@@ -187,6 +186,7 @@ def actualizar_grafico(mes, estado, theme):
 # --- Ejecutar ---
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
+
 
 
 
