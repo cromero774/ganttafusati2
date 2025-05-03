@@ -5,10 +5,12 @@ import requests
 import sys
 import datetime
 
+# Función para imprimir debug en consola
 def debug_print(message):
     print(f"DEBUG: {message}", file=sys.stderr)
     sys.stderr.flush()
 
+# URL de la hoja de cálculo pública
 sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6s9qMzmA_sJRko5EDggumO4sybGVq3n-uOmZOMj8CJDnHo9AWZeZOXZGz7cTg4XoqeiPDIgQP3QER/pub?output=csv"
 
 try:
@@ -16,32 +18,19 @@ try:
     response = requests.get(sheet_url, timeout=15)
     response.raise_for_status()
     debug_print(f"Respuesta recibida. Status code: {response.status_code}")
-    debug_print(f"Primeros 200 caracteres: {response.text[:200]}")
     df = pd.read_csv(sheet_url, encoding='utf-8')
     df.columns = df.columns.str.strip()
     df['RN'] = df['RN'].astype(str).str.strip()
-    debug_print(f"Columnas detectadas: {df.columns.tolist()}")
-    debug_print(f"Primeras filas: {df.head(2).to_dict()}")
+
     for col in ['Inicio', 'Fin']:
-        try:
-            df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')
-        except:
-            try:
-                df[col] = pd.to_datetime(df[col], format='%d-%m-%Y', errors='coerce')
-            except:
-                try:
-                    df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
-                except Exception as e:
-                    debug_print(f"Error en conversión de fechas para columna {col}: {e}")
-    debug_print(f"Muestra de fechas después de conversión: {df[['Inicio', 'Fin']].head(3)}")
+        df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
+
     df = df.dropna(subset=['Inicio', 'Fin'])
-    debug_print(f"Filas restantes después de eliminar NaT: {len(df)}")
     df['Inicio_str'] = df['Inicio'].dt.strftime('%d-%m-%Y')
     df['Fin_str'] = df['Fin'].dt.strftime('%d-%m-%Y')
     df['Duracion'] = (df['Fin'] - df['Inicio']).dt.days
     df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
     df['RN_trunc'] = df['RN'].apply(lambda x: x if len(x) <= 30 else x[:27] + '...')
-    debug_print(f"DataFrame procesado. Forma final: {df.shape}")
 except Exception as e:
     debug_print(f"Error cargando datos: {e}")
     sample_dates = pd.date_range(start='2023-01-01', periods=3)
@@ -57,6 +46,7 @@ except Exception as e:
     df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
     df['RN_trunc'] = df['RN']
 
+# Colores para los estados
 color_estado = {
     'Entregado': '#2ecc71',
     'En desarrollo': '#1abc9c',
@@ -101,7 +91,6 @@ app.layout = html.Div([
             )
         ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'}),
     ], style={'marginBottom': '20px'}),
-
     html.Div([
         html.Label("Tema:"),
         dcc.RadioItems(
@@ -114,33 +103,34 @@ app.layout = html.Div([
             labelStyle={'display': 'inline-block', 'marginRight': '10px'}
         )
     ], style={'marginBottom': '20px'}),
-
-    html.Div([
-        dcc.Graph(id='gantt-graph', style={'height': '80vh'})
-    ]),
+    dcc.Graph(id='gantt-graph', style={'height': '80vh'}),
     html.Div(id='debug-info', style={'whiteSpace': 'pre-wrap', 'padding': '10px', 'border': '1px solid #ddd'})
 ])
 
 @app.callback(
     [Output('gantt-graph', 'figure'),
      Output('debug-info', 'children')],
-    Input('mes-dropdown', 'value'),
-    Input('estado-dropdown', 'value'),
-    Input('theme-switch', 'value')
+    [Input('mes-dropdown', 'value'),
+     Input('estado-dropdown', 'value'),
+     Input('theme-switch', 'value')]
 )
 def actualizar_grafico(mes, estados, theme):
     df_filtrado = df.copy()
     debug_info = f"Datos cargados: {len(df)} filas\n"
     debug_info += f"Filtros: Mes={mes}, Estado={estados}\n"
+
     if mes != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['Mes'] == mes]
+
     if isinstance(estados, list):
         if 'Todos' not in estados:
             df_filtrado = df_filtrado[df_filtrado['Estado'].isin(estados)]
     else:
         if estados != 'Todos':
             df_filtrado = df_filtrado[df_filtrado['Estado'] == estados]
+
     debug_info += f"Datos filtrados: {len(df_filtrado)} filas\n"
+
     if df_filtrado.empty:
         debug_info += "¡No hay datos después del filtrado!"
         return px.scatter(title="Sin datos con los filtros seleccionados"), debug_info
@@ -184,7 +174,7 @@ def actualizar_grafico(mes, estados, theme):
             width=0.3
         )
 
-        # Línea vertical para la fecha actual (sin annotation_position)
+        # Línea vertical para la fecha actual (sin usar annotation_position para evitar errores)
         fecha_actual = datetime.datetime.now()
         fig.add_vline(
             x=fecha_actual,
@@ -192,7 +182,6 @@ def actualizar_grafico(mes, estados, theme):
             line_dash="dash",
             line_color=current_line_color,
             annotation_text="Hoy",
-            # NO uses annotation_position aquí
             annotation_font_color=current_line_color,
             annotation_bgcolor=plot_bgcolor
         )
@@ -220,6 +209,7 @@ def actualizar_grafico(mes, estados, theme):
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
+
 
 
 
