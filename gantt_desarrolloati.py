@@ -4,7 +4,6 @@ from dash import Dash, dcc, html, Input, Output
 import sys
 import requests
 import os
-from io import StringIO
 
 def debug_print(message):
     print(f"DEBUG: {message}", file=sys.stderr)
@@ -17,21 +16,13 @@ sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6s9qMzmA_sJRko5ED
 try:
     response = requests.get(sheet_url, timeout=15)
     response.raise_for_status()
-
-    df = pd.read_csv(StringIO(response.text), encoding='utf-8')  # Usa 'latin1' si sigue fallando
+    df = pd.read_csv(sheet_url, encoding='utf-8')
     df.columns = df.columns.str.strip()
-
-    df['RN'] = df['RN'].astype(str) \
-                       .str.normalize('NFKD') \
-                       .str.encode('ascii', errors='ignore') \
-                       .str.decode('utf-8') \
-                       .str.replace(r'[\xa0\s]+', ' ', regex=True) \
-                       .str.strip()
+    df['RN'] = df['RN'].astype(str).str.replace(r'[\xa0\s]+', ' ', regex=True).str.strip()
 
     for col in ['Inicio', 'Fin']:
         df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')
-
-    df.dropna(subset=['Inicio', 'Fin', 'RN'], inplace=True)
+    df = df.dropna(subset=['Inicio', 'Fin'])
 
     if df.empty:
         sample_dates = pd.date_range(start='2023-01-01', periods=3)
@@ -48,7 +39,6 @@ try:
     df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
 
 except Exception as e:
-    debug_print(f"Error al cargar datos: {e}")
     sample_dates = pd.date_range(start='2023-01-01', periods=3)
     df = pd.DataFrame({
         'RN': ['Error - Sin datos', 'Ejemplo 2', 'Ejemplo 3'],
@@ -149,17 +139,18 @@ def actualizar_grafico(mes, estado, theme):
         gridcolor = '#eee'
 
     df_filtrado = df_filtrado.sort_values('Inicio', ascending=True)
-    df_filtrado['RN'] = pd.Categorical(df_filtrado['RN'], categories=df_filtrado['RN'], ordered=True)
+    df_filtrado['RN_corto'] = df_filtrado['RN'].apply(lambda x: x if len(x) <= 30 else x[:27] + '...')
+    df_filtrado['RN_corto'] = pd.Categorical(df_filtrado['RN_corto'], categories=df_filtrado['RN_corto'], ordered=True)
 
     fig = px.timeline(
         df_filtrado,
         x_start="Inicio",
         x_end="Fin",
-        y="RN",
+        y="RN_corto",
         color="Estado",
         color_discrete_map=color_estado,
         custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
-        labels={'Estado': 'Estado', 'RN': 'Requerimiento'},
+        labels={'Estado': 'Estado', 'RN_corto': 'Requerimiento'},
         title=f"Postventa - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
     )
 
@@ -239,6 +230,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
