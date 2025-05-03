@@ -4,10 +4,9 @@ from dash import Dash, dcc, html, Input, Output
 import requests
 import sys
 
-# --- Función de debug (puedes mantenerla si la necesitas para desarrollo interno) ---
+# --- Función de debug ---
 def debug_print(message):
-    print(f"DEBUG: {message}", file=sys.stderr)
-    sys.stderr.flush()
+    pass  # Desactivado para no mostrar en producción
 
 # --- Carga de datos ---
 sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6s9qMzmA_sJRko5EDggumO4sybGVq3n-uOmZOMj8CJDnHo9AWZeZOXZGz7cTg4XoqeiPDIgQP3QER/pub?output=csv"
@@ -18,23 +17,15 @@ try:
     df = pd.read_csv(sheet_url, encoding='utf-8')
     df.columns = df.columns.str.strip()
     df['RN'] = df['RN'].astype(str).str.strip()
-
     for col in ['Inicio', 'Fin']:
-        try:
-            df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')
-        except:
-            try:
-                df[col] = pd.to_datetime(df[col], format='%d-%m-%Y', errors='coerce')
-            except:
-                df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
-
+        df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
     df = df.dropna(subset=['Inicio', 'Fin'])
     df['Inicio_str'] = df['Inicio'].dt.strftime('%d-%m-%Y')
     df['Fin_str'] = df['Fin'].dt.strftime('%d-%m-%Y')
     df['Duracion'] = (df['Fin'] - df['Inicio']).dt.days
     df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
     df['RN_trunc'] = df['RN'].str.lower().apply(lambda x: x if len(x) <= 30 else x[:27] + '...')
-except Exception as e:
+except Exception:
     sample_dates = pd.date_range(start='2023-01-01', periods=3)
     df = pd.DataFrame({
         'RN': ['Error - Sin datos', 'Ejemplo 2', 'Ejemplo 3'],
@@ -79,7 +70,6 @@ app.layout = html.Div([
                 clearable=False
             )
         ], style={'width': '48%', 'display': 'inline-block'}),
-
         html.Div([
             html.Label("Estado:"),
             dcc.Dropdown(
@@ -119,7 +109,6 @@ app.layout = html.Div([
 )
 def actualizar_grafico(mes, estado, theme):
     df_filtrado = df.copy()
-
     if mes != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['Mes'] == mes]
     if estado != 'Todos':
@@ -158,8 +147,11 @@ def actualizar_grafico(mes, estado, theme):
     fig.update_traces(
         hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>Días: %{customdata[3]}",
         marker=dict(line=dict(width=0.3, color='DarkSlateGrey')),
-        width=0.6  # Grosor de barra mejorado
+        width=0.8
     )
+
+    altura_base = 50
+    altura_total = max(400, altura_base * len(df_filtrado['RN_trunc'].unique()))
 
     fig.update_layout(
         font=dict(size=12, color=font_color),
@@ -175,8 +167,8 @@ def actualizar_grafico(mes, estado, theme):
         plot_bgcolor=plot_bgcolor,
         paper_bgcolor=paper_bgcolor,
         legend=dict(title="Estado", x=1.01, y=1, font=dict(size=10)),
-        margin=dict(l=20, r=250, t=50, b=50),
-        height=800
+        margin=dict(l=20, r=250, t=30, b=30),
+        height=altura_total
     )
 
     return fig
@@ -184,6 +176,7 @@ def actualizar_grafico(mes, estado, theme):
 # --- Ejecutar ---
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
+
 
 
 
