@@ -3,7 +3,6 @@ import plotly.express as px
 from dash import Dash, dcc, html, Input, Output
 import requests
 import sys
-from datetime import datetime
 
 # --- Función de debug ---
 def debug_print(message):
@@ -42,6 +41,7 @@ try:
     df['Fin_str'] = df['Fin'].dt.strftime('%d-%m-%Y')
     df['Duracion'] = (df['Fin'] - df['Inicio']).dt.days
     df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
+    # RN en minúscula y truncado
     df['RN_trunc'] = df['RN'].str.lower().apply(lambda x: x if len(x) <= 30 else x[:27] + '...')
     debug_print(f"DataFrame procesado. Forma final: {df.shape}")
 except Exception as e:
@@ -151,17 +151,11 @@ def actualizar_grafico(mes, estado, theme):
         paper_bgcolor = '#23272f'
         font_color = '#f0f0f0'
         gridcolor = '#444'
-        linecolor = '#FF6699'
-        ann_bgcolor = '#23272f'
-        ann_fontcolor = '#FF6699'
     else:
         plot_bgcolor = 'white'
         paper_bgcolor = 'white'
         font_color = '#222'
         gridcolor = '#eee'
-        linecolor = '#FF3366'
-        ann_bgcolor = 'white'
-        ann_fontcolor = '#FF3366'
 
     df_filtrado = df_filtrado.sort_values('Inicio')
     rn_order = df_filtrado['RN_trunc'].unique().tolist()
@@ -186,25 +180,7 @@ def actualizar_grafico(mes, estado, theme):
         fig.update_traces(
             hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>Días: %{customdata[3]}",
             marker=dict(line=dict(width=0.3, color='DarkSlateGrey')),
-            width=0.5
-        )
-
-        # --- MARCAR FECHA ACTUAL ---
-        fecha_actual = pd.to_datetime(datetime.now().date())
-        fig.add_vline(
-            x=fecha_actual,
-            line_width=2,
-            line_dash="dash",
-            line_color=linecolor,
-            annotation_text=fecha_actual.strftime('%d-%m-%Y'),
-            annotation_position="top",
-            annotation=dict(
-                font_size=13,
-                font_color=ann_fontcolor,
-                bgcolor=ann_bgcolor,
-                bordercolor=linecolor,
-                borderpad=4
-            )
+            width=0.5  # Grosor de barra intermedio
         )
 
         fig.update_layout(
@@ -214,7 +190,7 @@ def actualizar_grafico(mes, estado, theme):
                 title="Requerimiento",
                 categoryorder='array',
                 categoryarray=rn_order,
-                tickfont=dict(size=11),
+                tickfont=dict(size=11),  # Letra más chica en eje Y
                 title_font=dict(size=13)
             ),
             plot_bgcolor=plot_bgcolor,
@@ -235,6 +211,7 @@ def actualizar_grafico(mes, estado, theme):
 # --- Ejecutar ---
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
+
 
 
 
