@@ -140,6 +140,7 @@ def actualizar_grafico(mes, estados, theme):
     debug_info += f"Filtros: Mes={mes}, Estado={estados}\n"
     if mes != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['Mes'] == mes]
+    # Multi-selección de estado
     if isinstance(estados, list):
         if 'Todos' not in estados:
             df_filtrado = df_filtrado[df_filtrado['Estado'].isin(estados)]
@@ -194,7 +195,7 @@ def actualizar_grafico(mes, estados, theme):
         # Línea vertical para la fecha actual
         fecha_actual = datetime.datetime.now()
         fig.add_vline(
-            x=fecha_actual,
+            x=fecha_actual,  # datetime.datetime está bien aquí
             line_width=2,
             line_dash="dash",
             line_color=current_line_color,
