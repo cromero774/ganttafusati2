@@ -164,7 +164,7 @@ def actualizar_grafico(mes, estado, theme):
         )
 
         # Línea de la fecha actual
-        today = datetime.datetime.today()
+        today = pd.Timestamp.today()
         fig.add_vline(
             x=today,
             line_width=1,
@@ -200,6 +200,7 @@ def actualizar_grafico(mes, estado, theme):
 # --- Ejecutar ---
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
+
 
 
 
