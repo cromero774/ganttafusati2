@@ -5,12 +5,10 @@ import requests
 import sys
 import datetime
 
-# --- Función de debug ---
 def debug_print(message):
     print(f"DEBUG: {message}", file=sys.stderr)
     sys.stderr.flush()
 
-# --- Carga de datos ---
 sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6s9qMzmA_sJRko5EDggumO4sybGVq3n-uOmZOMj8CJDnHo9AWZeZOXZGz7cTg4XoqeiPDIgQP3QER/pub?output=csv"
 
 try:
@@ -59,7 +57,6 @@ except Exception as e:
     df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
     df['RN_trunc'] = df['RN']
 
-# --- Colores por estado ---
 color_estado = {
     'Entregado': '#2ecc71',
     'En desarrollo': '#1abc9c',
@@ -72,11 +69,9 @@ color_estado = {
     'Error': '#e74c3c'
 }
 
-# --- App Dash ---
 app = Dash(__name__)
 server = app.server
 
-# --- Layout ---
 app.layout = html.Div([
     html.H1("Gantt desarrollo ATI", style={'textAlign': 'center'}),
     html.Div(
@@ -126,7 +121,6 @@ app.layout = html.Div([
     html.Div(id='debug-info', style={'whiteSpace': 'pre-wrap', 'padding': '10px', 'border': '1px solid #ddd'})
 ])
 
-# --- Callback ---
 @app.callback(
     [Output('gantt-graph', 'figure'),
      Output('debug-info', 'children')],
@@ -190,15 +184,15 @@ def actualizar_grafico(mes, estados, theme):
             width=0.3
         )
 
-        # Línea vertical para la fecha actual (como string ISO)
-        fecha_actual = datetime.datetime.now().date().isoformat()
+        # Línea vertical para la fecha actual (sin annotation_position)
+        fecha_actual = datetime.datetime.now()
         fig.add_vline(
             x=fecha_actual,
             line_width=2,
             line_dash="dash",
             line_color=current_line_color,
             annotation_text="Hoy",
-            annotation_position="top",
+            # NO uses annotation_position aquí
             annotation_font_color=current_line_color,
             annotation_bgcolor=plot_bgcolor
         )
@@ -224,9 +218,9 @@ def actualizar_grafico(mes, estados, theme):
         debug_info += f"Error al generar gráfico: {e}"
         return px.scatter(title=f"Error al generar gráfico: {e}"), debug_info
 
-# --- Ejecutar ---
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
+
 
 
 
