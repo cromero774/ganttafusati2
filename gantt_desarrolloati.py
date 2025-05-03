@@ -4,7 +4,7 @@ from dash import Dash, dcc, html, Input, Output
 import sys
 import requests
 import os
-from io import StringIO  # <-- Necesario para leer el CSV desde response.text
+from io import StringIO
 
 def debug_print(message):
     print(f"DEBUG: {message}", file=sys.stderr)
@@ -17,17 +17,21 @@ sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6s9qMzmA_sJRko5ED
 try:
     response = requests.get(sheet_url, timeout=15)
     response.raise_for_status()
-    
-    # Leer el CSV desde el contenido de la respuesta
-    df = pd.read_csv(StringIO(response.text))
-    df.columns = df.columns.str.strip()
-    df['RN'] = df['RN'].astype(str).str.replace(r'[\xa0\s]+', ' ', regex=True).str.strip()
 
-    # Convertir columnas de fechas
+    df = pd.read_csv(StringIO(response.text), encoding='utf-8')  # Usa 'latin1' si sigue fallando
+    df.columns = df.columns.str.strip()
+
+    df['RN'] = df['RN'].astype(str) \
+                       .str.normalize('NFKD') \
+                       .str.encode('ascii', errors='ignore') \
+                       .str.decode('utf-8') \
+                       .str.replace(r'[\xa0\s]+', ' ', regex=True) \
+                       .str.strip()
+
     for col in ['Inicio', 'Fin']:
-        df[col] = pd.to_datetime(df[col], errors='coerce')  # ← Usamos detección automática de formato
-    
-    df = df.dropna(subset=['Inicio', 'Fin'])
+        df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')
+
+    df.dropna(subset=['Inicio', 'Fin', 'RN'], inplace=True)
 
     if df.empty:
         sample_dates = pd.date_range(start='2023-01-01', periods=3)
@@ -44,6 +48,7 @@ try:
     df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
 
 except Exception as e:
+    debug_print(f"Error al cargar datos: {e}")
     sample_dates = pd.date_range(start='2023-01-01', periods=3)
     df = pd.DataFrame({
         'RN': ['Error - Sin datos', 'Ejemplo 2', 'Ejemplo 3'],
@@ -234,6 +239,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug_print("Iniciando servidor...")
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
 
 
