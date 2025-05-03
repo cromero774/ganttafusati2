@@ -100,9 +100,9 @@ app.layout = html.Div([
                 id='estado-dropdown',
                 options=[{'label': 'Todos', 'value': 'Todos'}] +
                         [{'label': estado, 'value': estado} for estado in sorted(df['Estado'].unique())],
-                value=['Todos'],  # <-- Es lista, no string
+                value=['Todos'],
                 clearable=False,
-                multi=True  # <-- Permite multiselección
+                multi=True
             )
         ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'}),
     ], style={'marginBottom': '20px'}),
@@ -131,7 +131,7 @@ app.layout = html.Div([
     [Output('gantt-graph', 'figure'),
      Output('debug-info', 'children')],
     Input('mes-dropdown', 'value'),
-    Input('estado-dropdown', 'value'),  # Recibe lista
+    Input('estado-dropdown', 'value'),
     Input('theme-switch', 'value')
 )
 def actualizar_grafico(mes, estados, theme):
@@ -140,7 +140,6 @@ def actualizar_grafico(mes, estados, theme):
     debug_info += f"Filtros: Mes={mes}, Estado={estados}\n"
     if mes != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['Mes'] == mes]
-    # Multi-selección de estado
     if isinstance(estados, list):
         if 'Todos' not in estados:
             df_filtrado = df_filtrado[df_filtrado['Estado'].isin(estados)]
@@ -185,15 +184,14 @@ def actualizar_grafico(mes, estados, theme):
             title=f"Postventa - {', '.join(estados) if isinstance(estados, list) and 'Todos' not in estados else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
         )
 
-        # Barras más delgadas
         fig.update_traces(
             hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>Días: %{customdata[3]}",
             marker=dict(line=dict(width=0.3, color='DarkSlateGrey')),
             width=0.3
         )
 
-        # Línea vertical para la fecha actual
-        fecha_actual = datetime.datetime.now()
+        # Línea vertical para la fecha actual (como string ISO)
+        fecha_actual = datetime.datetime.now().date().isoformat()
         fig.add_vline(
             x=fecha_actual,
             line_width=2,
@@ -208,7 +206,7 @@ def actualizar_grafico(mes, estados, theme):
         fig.update_layout(
             xaxis=dict(title="Fecha", tickformat="%d-%m-%Y", gridcolor=gridcolor),
             yaxis=dict(
-                autorange="reversed", 
+                autorange="reversed",
                 title="Requerimiento",
                 categoryorder='array',
                 categoryarray=rn_order
@@ -229,6 +227,7 @@ def actualizar_grafico(mes, estados, theme):
 # --- Ejecutar ---
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
+
 
 
 
