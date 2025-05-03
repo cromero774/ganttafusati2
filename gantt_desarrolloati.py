@@ -3,22 +3,25 @@ import plotly.express as px
 from dash import Dash, dcc, html, Input, Output
 import datetime
 
-# Carga de datos
+# Cargar datos
 sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6s9qMzmA_sJRko5EDggumO4sybGVq3n-uOmZOMj8CJDnHo9AWZeZOXZGz7cTg4XoqeiPDIgQP3QER/pub?output=csv"
 df = pd.read_csv(sheet_url, encoding='utf-8')
 df.columns = df.columns.str.strip()
 df['RN'] = df['RN'].astype(str).str.strip()
 
-# Conversión robusta de fechas
-for col in ['Inicio', 'Fin']:
-    df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')
+# Convertir fechas con dayfirst=True
+df['Inicio'] = pd.to_datetime(df['Inicio'], dayfirst=True, errors='coerce')
+df['Fin'] = pd.to_datetime(df['Fin'], dayfirst=True, errors='coerce')
 
-# Verifica que las fechas se hayan convertido bien
-print("Columnas:", df.columns)
+# Mostrar info para debug
+print("Columnas:", df.columns.tolist())
 print("Primeras filas:\n", df.head())
 print("Tipos de datos:\n", df.dtypes)
 
+# Eliminar filas con fechas inválidas
 df = df.dropna(subset=['Inicio', 'Fin'])
+
+# Crear columnas auxiliares
 df['Inicio_str'] = df['Inicio'].dt.strftime('%d-%m-%Y')
 df['Fin_str'] = df['Fin'].dt.strftime('%d-%m-%Y')
 df['Duracion'] = (df['Fin'] - df['Inicio']).dt.days
@@ -42,10 +45,8 @@ server = app.server
 
 app.layout = html.Div([
     html.H1("Gantt desarrollo ATI", style={'textAlign': 'center'}),
-    html.Div(
-        f"Fecha actual: {datetime.datetime.now().strftime('%d-%m-%Y')}",
-        style={'textAlign': 'right', 'fontSize': '14px', 'color': '#888', 'marginBottom': '10px'}
-    ),
+    html.Div(f"Fecha actual: {datetime.datetime.now().strftime('%d-%m-%Y')}",
+             style={'textAlign': 'right', 'fontSize': '14px', 'color': '#888', 'marginBottom': '10px'}),
     html.Div([
         html.Div([
             html.Label("Mes de entrega:"),
@@ -102,6 +103,10 @@ def actualizar_grafico(mes, estados, theme):
     else:
         if estados != 'Todos':
             df_filtrado = df_filtrado[df_filtrado['Estado'] == estados]
+
+    # Debug: verificar filas y columnas
+    print("Filas después de filtro:", len(df_filtrado))
+    print(df_filtrado[['RN_trunc', 'Inicio', 'Fin']].head())
 
     if df_filtrado.empty:
         return px.scatter(title="No hay datos con los filtros seleccionados"), "No hay datos para mostrar con los filtros actuales."
@@ -176,6 +181,7 @@ def actualizar_grafico(mes, estados, theme):
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
+
 
 
 
