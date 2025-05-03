@@ -100,9 +100,9 @@ app.layout = html.Div([
                 id='estado-dropdown',
                 options=[{'label': 'Todos', 'value': 'Todos'}] +
                         [{'label': estado, 'value': estado} for estado in sorted(df['Estado'].unique())],
-                value=['Todos'],
+                value=['Todos'],  # <-- Es lista, no string
                 clearable=False,
-                multi=True
+                multi=True  # <-- Permite multiselección
             )
         ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'}),
     ], style={'marginBottom': '20px'}),
@@ -131,7 +131,7 @@ app.layout = html.Div([
     [Output('gantt-graph', 'figure'),
      Output('debug-info', 'children')],
     Input('mes-dropdown', 'value'),
-    Input('estado-dropdown', 'value'),
+    Input('estado-dropdown', 'value'),  # Recibe lista
     Input('theme-switch', 'value')
 )
 def actualizar_grafico(mes, estados, theme):
@@ -195,7 +195,7 @@ def actualizar_grafico(mes, estados, theme):
         # Línea vertical para la fecha actual
         fecha_actual = datetime.datetime.now()
         fig.add_vline(
-            x=fecha_actual,  # datetime.datetime está bien aquí
+            x=fecha_actual,
             line_width=2,
             line_dash="dash",
             line_color=current_line_color,
@@ -229,6 +229,7 @@ def actualizar_grafico(mes, estados, theme):
 # --- Ejecutar ---
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
+
 
 
 
