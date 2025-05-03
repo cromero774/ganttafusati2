@@ -6,7 +6,7 @@ import sys
 
 # --- Función de debug ---
 def debug_print(message):
-    pass  # Desactivado para no mostrar en producción
+    pass  # Desactivado para entorno de producción
 
 # --- Carga de datos ---
 sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6s9qMzmA_sJRko5EDggumO4sybGVq3n-uOmZOMj8CJDnHo9AWZeZOXZGz7cTg4XoqeiPDIgQP3QER/pub?output=csv"
@@ -18,7 +18,16 @@ try:
     df.columns = df.columns.str.strip()
     df['RN'] = df['RN'].astype(str).str.strip()
     for col in ['Inicio', 'Fin']:
-        df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
+        try:
+            df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')
+        except:
+            try:
+                df[col] = pd.to_datetime(df[col], format='%d-%m-%Y', errors='coerce')
+            except:
+                try:
+                    df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
+                except Exception:
+                    pass
     df = df.dropna(subset=['Inicio', 'Fin'])
     df['Inicio_str'] = df['Inicio'].dt.strftime('%d-%m-%Y')
     df['Fin_str'] = df['Fin'].dt.strftime('%d-%m-%Y')
@@ -109,6 +118,7 @@ app.layout = html.Div([
 )
 def actualizar_grafico(mes, estado, theme):
     df_filtrado = df.copy()
+    
     if mes != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['Mes'] == mes]
     if estado != 'Todos':
@@ -133,49 +143,51 @@ def actualizar_grafico(mes, estado, theme):
     df_filtrado['RN_order'] = df_filtrado['RN_trunc'].map({rn: i for i, rn in enumerate(rn_order)})
     df_filtrado = df_filtrado.sort_values('RN_order')
 
-    fig = px.timeline(
-        df_filtrado,
-        x_start="Inicio",
-        x_end="Fin",
-        y="RN_trunc",
-        color="Estado",
-        custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
-        color_discrete_map=color_estado,
-        title=f"ATI - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
-    )
+    try:
+        fig = px.timeline(
+            df_filtrado,
+            x_start="Inicio",
+            x_end="Fin",
+            y="RN_trunc",
+            color="Estado",
+            custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
+            color_discrete_map=color_estado,
+            title=f"ATI - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
+        )
 
-    fig.update_traces(
-        hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>Días: %{customdata[3]}",
-        marker=dict(line=dict(width=0.3, color='DarkSlateGrey')),
-        width=0.8
-    )
+        fig.update_traces(
+            hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>Días: %{customdata[3]}",
+            marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
+        )
 
-    altura_base = 50
-    altura_total = max(400, altura_base * len(df_filtrado['RN_trunc'].unique()))
+        fig.update_layout(
+            xaxis=dict(title="Fecha", tickformat="%d-%m-%Y", gridcolor=gridcolor),
+            yaxis=dict(
+                autorange="reversed", 
+                title="Requerimiento",
+                categoryorder='array',
+                categoryarray=rn_order,
+                tickfont=dict(size=11),
+                title_font=dict(size=13)
+            ),
+            plot_bgcolor=plot_bgcolor,
+            paper_bgcolor=paper_bgcolor,
+            font=dict(color=font_color),
+            legend=dict(title="Estado", x=1.01, y=1),
+            margin=dict(l=20, r=250, t=50, b=50),
+            height=800,
+            bargap=0  # Elimina separación vertical entre barras
+        )
 
-    fig.update_layout(
-        font=dict(size=12, color=font_color),
-        xaxis=dict(title="Fecha", tickformat="%d-%m-%Y", gridcolor=gridcolor),
-        yaxis=dict(
-            autorange="reversed",
-            title="Requerimiento",
-            categoryorder='array',
-            categoryarray=rn_order,
-            tickfont=dict(size=10),
-            title_font=dict(size=12)
-        ),
-        plot_bgcolor=plot_bgcolor,
-        paper_bgcolor=paper_bgcolor,
-        legend=dict(title="Estado", x=1.01, y=1, font=dict(size=10)),
-        margin=dict(l=20, r=250, t=30, b=30),
-        height=altura_total
-    )
+        return fig
 
-    return fig
+    except Exception as e:
+        return px.scatter(title=f"Error al generar gráfico: {e}")
 
 # --- Ejecutar ---
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
+
 
 
 
