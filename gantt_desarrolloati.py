@@ -3,6 +3,7 @@ import plotly.express as px
 from dash import Dash, dcc, html, Input, Output
 import requests
 import sys
+import datetime
 
 # --- Función de debug ---
 def debug_print(message):
@@ -16,22 +17,14 @@ try:
     debug_print("Intentando cargar datos desde URL...")
     response = requests.get(sheet_url, timeout=15)
     response.raise_for_status()
-    
-    # Guardar datos para debugging
     debug_print(f"Respuesta recibida. Status code: {response.status_code}")
     debug_print(f"Primeros 200 caracteres: {response.text[:200]}")
-    
-    # Cargar CSV
     df = pd.read_csv(sheet_url, encoding='utf-8')
     df.columns = df.columns.str.strip()
     df['RN'] = df['RN'].astype(str).str.strip()
-    
     debug_print(f"Columnas detectadas: {df.columns.tolist()}")
     debug_print(f"Primeras filas: {df.head(2).to_dict()}")
-    
-    # Conversión de fechas con manejo explícito del formato
     for col in ['Inicio', 'Fin']:
-        # Intentar varios formatos de fecha, priorizando día-mes-año
         try:
             df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')
         except:
@@ -42,22 +35,15 @@ try:
                     df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
                 except Exception as e:
                     debug_print(f"Error en conversión de fechas para columna {col}: {e}")
-    
     debug_print(f"Muestra de fechas después de conversión: {df[['Inicio', 'Fin']].head(3)}")
-    
-    # Eliminar filas con fechas inválidas
     df = df.dropna(subset=['Inicio', 'Fin'])
     debug_print(f"Filas restantes después de eliminar NaT: {len(df)}")
-    
-    # Crear columnas adicionales
     df['Inicio_str'] = df['Inicio'].dt.strftime('%d-%m-%Y')
     df['Fin_str'] = df['Fin'].dt.strftime('%d-%m-%Y')
     df['Duracion'] = (df['Fin'] - df['Inicio']).dt.days
     df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
     df['RN_trunc'] = df['RN'].apply(lambda x: x if len(x) <= 30 else x[:27] + '...')
-    
     debug_print(f"DataFrame procesado. Forma final: {df.shape}")
-
 except Exception as e:
     debug_print(f"Error cargando datos: {e}")
     sample_dates = pd.date_range(start='2023-01-01', periods=3)
@@ -93,6 +79,10 @@ server = app.server
 # --- Layout ---
 app.layout = html.Div([
     html.H1("Gantt desarrollo ATI", style={'textAlign': 'center'}),
+    html.Div(
+        f"Fecha actual: {datetime.datetime.now().strftime('%d-%m-%Y')}",
+        style={'textAlign': 'right', 'fontSize': '14px', 'color': '#888', 'marginBottom': '10px'}
+    ),
     html.Div([
         html.Div([
             html.Label("Mes de entrega:"),
@@ -110,8 +100,9 @@ app.layout = html.Div([
                 id='estado-dropdown',
                 options=[{'label': 'Todos', 'value': 'Todos'}] +
                         [{'label': estado, 'value': estado} for estado in sorted(df['Estado'].unique())],
-                value='Todos',
-                clearable=False
+                value=['Todos'],
+                clearable=False,
+                multi=True
             )
         ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'}),
     ], style={'marginBottom': '20px'}),
@@ -132,8 +123,6 @@ app.layout = html.Div([
     html.Div([
         dcc.Graph(id='gantt-graph', style={'height': '80vh'})
     ]),
-    
-    # Añadir sección de depuración
     html.Div(id='debug-info', style={'whiteSpace': 'pre-wrap', 'padding': '10px', 'border': '1px solid #ddd'})
 ])
 
@@ -145,18 +134,19 @@ app.layout = html.Div([
     Input('estado-dropdown', 'value'),
     Input('theme-switch', 'value')
 )
-def actualizar_grafico(mes, estado, theme):
+def actualizar_grafico(mes, estados, theme):
     df_filtrado = df.copy()
     debug_info = f"Datos cargados: {len(df)} filas\n"
-    debug_info += f"Filtros: Mes={mes}, Estado={estado}\n"
-    
+    debug_info += f"Filtros: Mes={mes}, Estado={estados}\n"
     if mes != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['Mes'] == mes]
-    if estado != 'Todos':
-        df_filtrado = df_filtrado[df_filtrado['Estado'] == estado]
-    
+    if isinstance(estados, list):
+        if 'Todos' not in estados:
+            df_filtrado = df_filtrado[df_filtrado['Estado'].isin(estados)]
+    else:
+        if estados != 'Todos':
+            df_filtrado = df_filtrado[df_filtrado['Estado'] == estados]
     debug_info += f"Datos filtrados: {len(df_filtrado)} filas\n"
-    
     if df_filtrado.empty:
         debug_info += "¡No hay datos después del filtrado!"
         return px.scatter(title="Sin datos con los filtros seleccionados"), debug_info
@@ -166,16 +156,15 @@ def actualizar_grafico(mes, estado, theme):
         paper_bgcolor = '#23272f'
         font_color = '#f0f0f0'
         gridcolor = '#444'
+        current_line_color = '#e74c3c'
     else:
         plot_bgcolor = 'white'
         paper_bgcolor = 'white'
         font_color = '#222'
         gridcolor = '#eee'
+        current_line_color = '#e74c3c'
 
     df_filtrado = df_filtrado.sort_values('Inicio')
-    
-    # Corregir el manejo de categorías
-    # En lugar de usar Categorical con categories=df_filtrado['RN_trunc'], creamos una lista ordenada
     rn_order = df_filtrado['RN_trunc'].unique().tolist()
     df_filtrado['RN_order'] = df_filtrado['RN_trunc'].map({rn: i for i, rn in enumerate(rn_order)})
     df_filtrado = df_filtrado.sort_values('RN_order')
@@ -192,12 +181,27 @@ def actualizar_grafico(mes, estado, theme):
             color="Estado",
             custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
             color_discrete_map=color_estado,
-            title=f"Postventa - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
+            title=f"Postventa - {', '.join(estados) if isinstance(estados, list) and 'Todos' not in estados else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
         )
 
+        # Barras más delgadas
         fig.update_traces(
             hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>Días: %{customdata[3]}",
-            marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
+            marker=dict(line=dict(width=0.3, color='DarkSlateGrey')),
+            width=0.3
+        )
+
+        # Línea vertical para la fecha actual
+        fecha_actual = datetime.datetime.now()
+        fig.add_vline(
+            x=fecha_actual,
+            line_width=2,
+            line_dash="dash",
+            line_color=current_line_color,
+            annotation_text="Hoy",
+            annotation_position="top",
+            annotation_font_color=current_line_color,
+            annotation_bgcolor=plot_bgcolor
         )
 
         fig.update_layout(
@@ -215,10 +219,8 @@ def actualizar_grafico(mes, estado, theme):
             margin=dict(l=20, r=250, t=50, b=50),
             height=800
         )
-        
         debug_info += "Gráfico generado correctamente"
         return fig, debug_info
-    
     except Exception as e:
         debug_info += f"Error al generar gráfico: {e}"
         return px.scatter(title=f"Error al generar gráfico: {e}"), debug_info
@@ -226,6 +228,7 @@ def actualizar_grafico(mes, estado, theme):
 # --- Ejecutar ---
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
+
 
 
 
