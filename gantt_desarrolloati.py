@@ -164,16 +164,17 @@ def actualizar_grafico(mes, estado, theme):
         )
 
         # Línea de la fecha actual
-        today = pd.Timestamp.today()
-        fig.add_vline(
-            x=today,
-            line_width=1,
-            line_dash="dot",
-            line_color=current_date_color,
-            annotation_text="Hoy",
-            annotation_position="top left"
-        )
+        from datetime import datetime
 
+        today = datetime.today()
+        fig.add_vline(
+           x=today,
+           line_width=1,
+           line_dash="dot",
+           line_color=current_date_color,
+           annotation_text="Hoy",
+           annotation_position="top left"
+        )
         fig.update_layout(
             xaxis=dict(title="Fecha", tickformat="%d-%m-%Y", gridcolor=gridcolor),
             yaxis=dict(
