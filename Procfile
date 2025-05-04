@@ -1,3 +1,3 @@
-web: gunicorn gantt_desarrolloati:server
+web: gunicorn gantt_afuati:server
 
 
