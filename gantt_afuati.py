@@ -10,7 +10,8 @@ def debug_print(message):
     pass  # Desactivado para entorno de producción
 
 # --- Carga de datos ---
-sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6s9qMzmA_sJRko5EDggumO4sybGVq3n-uOmZOMj8CJDnHo9AWZeZOXZGz7cTg4XoqeiPDIgQP3QER/pub?output=csv"
+# Actualiza la URL del CSV aquí con tu nuevo enlace
+sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vThHnFUDJm9AlT-rODLiPhLSTqH1O12_yz0Z_0SJJ3EAtS84GH6lptWpr2eSMPuyv50ShS3ysozwsKe/pub?output=csv"
 
 try:
     response = requests.get(sheet_url, timeout=15)
@@ -18,6 +19,11 @@ try:
     df = pd.read_csv(sheet_url, encoding='utf-8')
     df.columns = df.columns.str.strip()
     df['RN'] = df['RN'].astype(str).str.strip()
+    
+    # Asegúrate de que la columna AFU asignado exista
+    if 'AFU asignado' not in df.columns:
+        df['AFU asignado'] = 'Sin asignar'  # Valor por defecto si no existe
+    
     for col in ['Inicio', 'Fin']:
         try:
             df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')
@@ -35,11 +41,13 @@ try:
     df['Duracion'] = (df['Fin'] - df['Inicio']).dt.days
     df['Mes'] = df['Fin'].dt.to_period('M').astype(str)
     df['RN_trunc'] = df['RN'].str.lower().apply(lambda x: x if len(x) <= 30 else x[:27] + '...')
-except Exception:
+except Exception as e:
+    print(f"Error al cargar datos: {e}")
     sample_dates = pd.date_range(start='2023-01-01', periods=3)
     df = pd.DataFrame({
         'RN': ['Error - Sin datos', 'Ejemplo 2', 'Ejemplo 3'],
         'Estado': ['Error', 'Error', 'Error'],
+        'AFU asignado': ['Sin asignar', 'Sin asignar', 'Sin asignar'],
         'Inicio': sample_dates,
         'Fin': sample_dates + pd.Timedelta(days=30),
     })
@@ -68,7 +76,7 @@ server = app.server
 
 # --- Layout ---
 app.layout = html.Div([
-    html.H1("Gantt desarrollo ATI", style={'textAlign': 'center'}),
+    html.H1("Gantt analisis funcional ATI", style={'textAlign': 'center'}),
     html.Div([
         html.Div([
             html.Label("Mes de entrega:"),
@@ -79,7 +87,7 @@ app.layout = html.Div([
                 value='Todos',
                 clearable=False
             )
-        ], style={'width': '48%', 'display': 'inline-block'}),
+        ], style={'width': '32%', 'display': 'inline-block'}),
         html.Div([
             html.Label("Estado:"),
             dcc.Dropdown(
@@ -89,7 +97,18 @@ app.layout = html.Div([
                 value='Todos',
                 clearable=False
             )
-        ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '10px'}),
+        ], style={'width': '32%', 'display': 'inline-block', 'marginLeft': '10px'}),
+        # Nuevo dropdown para AFU asignado
+        html.Div([
+            html.Label("AFU asignado:"),
+            dcc.Dropdown(
+                id='afu-dropdown',
+                options=[{'label': 'Todos', 'value': 'Todos'}] +
+                        [{'label': afu, 'value': afu} for afu in sorted(df['AFU asignado'].unique())],
+                value='Todos',
+                clearable=False
+            )
+        ], style={'width': '32%', 'display': 'inline-block', 'marginLeft': '10px'}),
     ], style={'marginBottom': '20px'}),
 
     html.Div([
@@ -115,15 +134,18 @@ app.layout = html.Div([
     Output('gantt-graph', 'figure'),
     Input('mes-dropdown', 'value'),
     Input('estado-dropdown', 'value'),
+    Input('afu-dropdown', 'value'),  # Nuevo input para el filtro de AFU
     Input('theme-switch', 'value')
 )
-def actualizar_grafico(mes, estado, theme):
+def actualizar_grafico(mes, estado, afu, theme):
     df_filtrado = df.copy()
 
     if mes != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['Mes'] == mes]
     if estado != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['Estado'] == estado]
+    if afu != 'Todos':  # Nuevo filtro para AFU asignado
+        df_filtrado = df_filtrado[df_filtrado['AFU asignado'] == afu]
 
     if df_filtrado.empty:
         return px.scatter(title="Sin datos con los filtros seleccionados")
@@ -155,13 +177,13 @@ def actualizar_grafico(mes, estado, theme):
             x_end="Fin",
             y="RN_trunc",
             color="Estado",
-            custom_data=["RN", "Inicio_str", "Fin_str", "Duracion"],
+            custom_data=["RN", "Inicio_str", "Fin_str", "Duracion", "AFU asignado"],  # Añadimos AFU a custom_data
             color_discrete_map=color_estado,
-            title=f"ATI - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'}"
+            title=f"ATI - {estado if estado != 'Todos' else 'Todos los estados'} | {mes if mes != 'Todos' else 'Todos los meses'} | {afu if afu != 'Todos' else 'Todos los AFU'}"
         )
 
         fig.update_traces(
-            hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}",
+            hovertemplate="<b>%{customdata[0]}</b><br>Inicio: %{customdata[1]}<br>Fin: %{customdata[2]}<br>AFU: %{customdata[4]}",  # Solo mostramos RN, fechas y AFU
             marker=dict(line=dict(width=0.3, color='DarkSlateGrey'))
         )
 
@@ -226,7 +248,6 @@ def actualizar_grafico(mes, estado, theme):
 # --- Ejecutar ---
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
-
 
 
 
